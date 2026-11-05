@@ -483,8 +483,9 @@ export async function createApp(db, { production = false, demo = false } = {}) {
 }
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   const production = process.env.NODE_ENV === 'production';
-  if (production && (!process.env.DATABASE_URL || !process.env.APP_ORIGIN?.startsWith('https://')))
-    throw Error('Produção exige DATABASE_URL PostgreSQL e APP_ORIGIN HTTPS.');
+  const databaseUrl = process.env.MYSQL_URL || process.env.DATABASE_URL;
+  if (production && (!databaseUrl || !/^mysql/i.test(databaseUrl) || !process.env.APP_ORIGIN?.startsWith('https://')))
+    throw Error('Produção exige MYSQL_URL MySQL e APP_ORIGIN HTTPS.');
   const demo = !production && process.env.SEED_DEMO !== 'false';
   const db = await connectDb();
   await seed(db, { demo });
