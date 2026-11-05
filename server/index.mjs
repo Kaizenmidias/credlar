@@ -632,7 +632,7 @@ export async function createApp(db, { production = false, demo = false } = {}) {
     catch (error) { return res.status(500).json({ message: error.message }); }
     const result = await testSolidesConnection({ baseUrl: saved?.base_url, token });
     if (!result.configured) return res.status(422).json(result);
-    if (!result.connected) return res.status(502).json(result);
+    if (!result.connected) return res.json({ ok: false, ...result });
     res.json({ ok: true, ...result });
   });
   app.put('/api/integration/credentials', admin, async (req, res) => {

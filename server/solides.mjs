@@ -7,7 +7,7 @@ export async function testSolidesConnection({ baseUrl = process.env.SOLIDES_API_
   const timer = setTimeout(() => controller.abort(), 10000);
   try {
     const response = await fetch(url, { method: 'GET', headers: { Accept: 'application/json', Authorization: `Basic ${token}` }, signal: controller.signal });
-    if (!response.ok) return { configured: true, connected: false, status: response.status, message: 'A Sólides recusou a autenticação ou a permissão.' };
+    if (!response.ok) return { configured: true, connected: false, status: response.status, message: `A Sólides recusou a autenticação ou a permissão (HTTP ${response.status}).` };
     const account = await response.json();
     return { configured: true, connected: true, status: response.status, accountStatus: typeof account.accountStatus === 'string' ? account.accountStatus : null, activeEmployeeCount: Number.isFinite(account.activeEmployeeCount) ? account.activeEmployeeCount : null };
   } catch (error) {

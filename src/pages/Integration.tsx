@@ -246,10 +246,9 @@ export default function Integration() {
               onClick={async () => {
                 try {
                   const result = await api('/integration/test', 'POST');
-                  notify(
-                    `Sólides conectada${result.activeEmployeeCount == null ? '' : ` · ${result.activeEmployeeCount} colaboradores ativos`}.`,
-                    'green',
-                  );
+                  notify(result.ok
+                    ? `Sólides conectada${result.activeEmployeeCount == null ? '' : ` · ${result.activeEmployeeCount} colaboradores ativos`}.`
+                    : result.message || 'A Sólides não aceitou a conexão.', result.ok ? 'green' : 'orange');
                 } catch (e) {
                   notify((e as Error).message, 'orange');
                 }
