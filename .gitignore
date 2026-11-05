@@ -1,6 +1,14 @@
-.DS_Store
-Thumbs.db
 node_modules/
 dist/
 .env
 .env.*
+!.env.example
+var/
+coverage/
+*.log
+*.db
+*.db-shm
+*.db-wal
+.DS_Store
+Thumbs.db
+Referências/

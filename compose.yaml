@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: dho
+      POSTGRES_USER: dho
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure POSTGRES_PASSWORD}
+    volumes:
+      - dho_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U dho -d dho']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:3001:3001'
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3001
+      DATABASE_URL: ${DATABASE_URL:?Configure URL PostgreSQL apontando para db:5432}
+      APP_ORIGIN: ${APP_ORIGIN:?Configure origem HTTPS}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Configure administrador inicial}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Configure senha inicial forte}
+      SEED_DEMO: 'false'
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  dho_pg:

@@ -1,0 +1,83 @@
+# Checklist de implementação
+
+Marcar `[x]` somente com código e evidência de verificação. Itens com `[ ]` continuam pendentes, mesmo que uma interface antecipada exista. O conjunto desta entrega é frontend completo de navegação e base funcional local; não representa liberação de todas as fases em produção.
+
+## Fase 1 — Fundação
+
+- [x] F1-01 Substituir página estática por React/TypeScript e roteamento dos 12 módulos.
+- [x] F1-02 Definir API Node, adaptador SQLite local/PostgreSQL produção e tabelas iniciais.
+- [x] F1-03 Login com scrypt, sessão HttpOnly, expiração, logout e RBAC admin/rh/consulta.
+- [x] F1-04 Cadastro de usuários por administrador, ativação/inativação e revogação de sessões.
+- [x] F1-05 Funcionários: todos os campos essenciais, CPF validado, matrícula única, busca, filtros, edição e detalhe.
+- [x] F1-06 Departamentos: Sede/Sala de vendas, responsáveis, regras distintas e parâmetros dominicais configuráveis.
+- [x] F1-07 Dashboard com dados do servidor, filtros, indicadores, pendências e distribuição.
+- [x] F1-08 Empresa responsável: razão social, nome, logo, dados de contato e cabeçalho documental.
+- [x] F1-09 Histórico básico de ações e controle otimista de edição de funcionários/departamentos.
+- [x] F1-10 Dados fictícios locais, build, testes API e regras de prévia.
+- [ ] F1-11 Recuperação real por e-mail: SMTP, token descartável/expiração, revogação e testes. Atual: orientação ao administrador.
+- [ ] F1-12 Migrações versionadas e teste de integração em PostgreSQL real (o adaptador já existe).
+- [x] F1-13a Dashboard: série temporal agrupada dinamicamente no intervalo selecionado, sem datas fixas.
+- [ ] F1-13b Dashboard: faltantes/suspeitos separados e quantidade de pessoas distintas com pendências.
+- [ ] F1-14 Acessibilidade/contraste/zoom 200% homologados; paginação e agregações no servidor.
+- [ ] F1-15 Deploy seguro da nova API/banco e revisão do fluxo inicial sem credenciais de validação.
+
+## Fase 2 — Integração e auditoria
+
+- [x] F2-01 Tela de integração, fontes oficiais e estado sem conexão falsa.
+- [x] F2-02 CSV/XLSX normalizado: prévia, modelo, confirmação, relatório por linha e importação básica.
+- [x] F2-03 Auditoria indicativa: quantidade por indivíduo, ausência, duplicidade, proximidade e comparação de entrada.
+- [x] F2-04 Vermelho/amarelo/verde com texto; detalhe, observação, pendente, descarte, conferido na Sólides, histórico.
+- [x] F2-05 Ocorrências manuais e normalizadas com tipo, período, origem e conferência.
+- [x] F2-06 Marcações originais imutáveis e nenhuma escrita na API Sólides.
+- [ ] F2-07 Obter token autorizado, Swagger vigente e amostras anonimizadas.
+- [ ] F2-08 Criptografia AES-GCM de token, chave fora do banco, endpoint só admin e segredo nunca retornado.
+- [ ] F2-09 Testar conexão verdadeira, permissões, limites e paginação com a conta do cliente.
+- [ ] F2-10 Importar funcionários/departamentos/escalas/pontos/ajustes/atestados/férias/afastamentos via contrato oficial validado.
+- [ ] F2-11 Job persistente, checkpoints, transação por lote, retries 429/5xx, status e cancelamento.
+- [ ] F2-12 IDs externos e deduplicação transacional; correções na origem e invalidação de revisões.
+- [ ] F2-13 Mapear exportações nativas Sólides (não confundir com modelo normalizado).
+- [ ] F2-14 Escalas com horários detalhados para 2/4/6+ batidas; comparação de cada intervalo e jornada prevista/real.
+- [ ] F2-15 Ocorrências: anexos privados, MIME real, antivírus, download autorizado, retenção.
+
+## Fase 3 — Cálculos
+
+- [x] F3-01 Prévia VA por datas de escala, feriados, vínculo, dias extras e exclusões individuais.
+- [x] F3-02 Prévia VT independente de VA, tarifa e passagens por pessoa.
+- [x] F3-03 Descontos só de ocorrências conferidas e datas sobrepostas únicas.
+- [x] F3-04 Prévia noturna atravessando meia-noite, minutos reduzidos, percentual e memória.
+- [x] F3-05 Memória de cálculo individual e exportação identificada como prévia.
+- [ ] F3-06 Migrar fonte de cálculo financeiro ao servidor com centavos/NUMERIC e regras com vigência.
+- [ ] F3-07 Homologar cenários reais, CCT, calendários e políticas de VA/VT separadamente.
+- [ ] F3-08 Gerar/verificar descanso dominical de acordo com escala, gênero quando juridicamente aplicável e revisão humana.
+- [ ] F3-09 Sábados efetivamente trabalhados na Sede: comprovação pela origem, sem exigir apenas lançamento manual.
+- [ ] F3-10 Mostrar descontos VA por faltas/atestados/suspensões/outros em colunas e drill-down.
+- [ ] F3-11 Override manual de dias/valor com justificativa, aprovação e diff histórico.
+- [ ] F3-12 Homologar hora noturna reduzida, prorrogação após pausa, jornadas longas e parâmetros setoriais.
+
+## Fase 4 — Fechamento e documentos
+
+- [x] F4-01 Intervalo livre por competência, departamento e funcionário opcional.
+- [x] F4-02 Conferência consolidada de funcionários, ocorrências, auditoria e totais.
+- [x] F4-03 11 relatórios PDF e Excel com logo e razão social configuradas.
+- [x] F4-04 API bloqueia fechamento definitivo enquanto motor não homologado.
+- [ ] F4-05 Máquina de estados e versões transacionais de fechamento.
+- [ ] F4-06 Snapshot imutável completo, incluindo identidade da empresa, regras e memórias.
+- [ ] F4-07 Exibir pendências e exigir ciência explícita/autoridade apropriada antes de finalizar.
+- [ ] F4-08 Reabrir com justificativa obrigatória e manter versão finalizada anterior consultável.
+- [ ] F4-09 Relatórios oficiais no servidor vinculados ao snapshot e histórico de geração/acesso.
+- [ ] F4-10 Homologação visual PDF multipágina e Excel no leitor utilizado pelo DHO.
+
+## Operação e privacidade — antes de dados reais
+
+- [x] Segredos e banco ignorados pelo Git; sem tokens de API no código.
+- [x] SQL parametrizado, validação no servidor, origem/cabeçalho anti-CSRF e limite no login.
+- [ ] Política de retenção, finalidade, responsável, direitos do titular e gestão de incidentes.
+- [ ] Criptografia de backups, armazenamento privado, retenção e restauração testada.
+- [ ] Logs append-only com diffs mascarados; permissões por campo/dado médico.
+- [ ] Monitoramento, alarmes, health/readiness, expurgo de sessões e procedimento de rollback.
+- [ ] Teste de isolamento entre perfis, IDOR e limite de upload em ambiente de produção.
+- [ ] Homologação final com RH/DHO e contabilidade.
+
+## Informações a fornecer
+
+Razão social legal e CNPJ do responsável; e-mail do administrador real; SMTP; token Sólides autorizado; contrato Swagger da conta; exemplos de exports anonimizados; escalas e slots por funcionário; datas/feriados; CCT aplicável; regras de VA e VT por ocorrência/departamento; divisor/hora noturna/prorrogação; regra de aprovação de pendências; destino e retenção de backups.
