@@ -45,7 +45,7 @@ Marcar `[x]` somente com código e evidência de verificação. Itens com `[ ]` 
 - [x] F3-02 Prévia VT independente de VA, tarifa e passagens por pessoa; endpoint autenticado no servidor.
 - [x] F3-03 Descontos só de ocorrências conferidas e datas sobrepostas únicas; regra compartilhada pelo backend.
 - [x] F3-04 Prévia noturna atravessando meia-noite, minutos reduzidos, percentual e memória; endpoint autenticado no servidor.
-- [x] F3-05 Memória de cálculo individual e exportação identificada como prévia.
+- [x] F3-05 Memória de cálculo individual e exportação identificada como prévia; telas VA/VT/noturno consumindo exclusivamente a API autenticada de prévia.
 - [ ] F3-06 Migrar fonte de cálculo financeiro ao servidor com centavos/NUMERIC e regras com vigência.
 - [ ] F3-07 Homologar cenários reais, CCT, calendários e políticas de VA/VT separadamente.
 - [ ] F3-08 Gerar/verificar descanso dominical de acordo com escala, gênero quando juridicamente aplicável e revisão humana.

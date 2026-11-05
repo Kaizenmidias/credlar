@@ -45,6 +45,22 @@ test('Fase 1: sessão, CRUD, RBAC, validação, duplicidade e histórico', async
     });
     const boot = (await req('/bootstrap')).data;
     assert.equal(boot.employees.length, 12);
+    await t.test('prévias de VA, VT e adicional noturno são calculadas no servidor', async () => {
+      for (const type of ['va', 'vt', 'night']) {
+        const result = await req('/calculations/preview', 'POST', {
+          type,
+          start: '2026-10-21',
+          end: '2026-10-31',
+          departmentId: '',
+          employeeId: '',
+        });
+        assert.equal(result.status, 200);
+        assert.equal(result.data.preview, true);
+        assert.equal(result.data.rows.length, 12);
+        assert.equal(typeof result.data.total, 'number');
+        assert.ok(result.data.rows[0].memory.formula);
+      }
+    });
     await t.test('cadastro e atualização persistem; conflito de versão é impedido', async () => {
       const draft = { ...boot.employees[0], registration: 'CRTEST', name: 'Pessoa de teste' };
       const add = await req('/employees', 'POST', draft);

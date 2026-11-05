@@ -212,7 +212,7 @@ export async function createApp(db, { production = false, demo = false } = {}) {
       demo,
     });
   });
-  app.post('/api/calculations/preview', write, async (req, res) => {
+  app.post('/api/calculations/preview', async (req, res) => {
     const input = z
       .object({
         type: z.enum(['va', 'vt', 'night']),

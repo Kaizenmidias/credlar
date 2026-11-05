@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Wallet,
@@ -22,22 +22,37 @@ import {
   Pagination,
 } from '../components/ui';
 import PeriodFilter from '../components/PeriodFilter';
-import { currency } from '../lib/api';
-import { calculate } from '../lib/calculations';
+import { api, currency } from '../lib/api';
 import { exportReport } from '../lib/export';
 export default function Benefits({ type }: { type: 'va' | 'vt' | 'night' }) {
   const { data, filters: f, notify } = useDho();
   const [memory, setMemory] = useState<any>(null),
     [page, setPage] = useState(1),
-    [busy, setBusy] = useState(false);
-  let calc;
-  try {
-    calc = calculate(data, f);
-  } catch (e) {
-    return <Notice tone="red">{(e as Error).message}</Notice>;
-  }
-  const rows = type === 'va' ? calc.va : type === 'vt' ? calc.vt : calc.night,
-    total = type === 'va' ? calc.totalVA : type === 'vt' ? calc.totalVT : calc.totalNight;
+    [busy, setBusy] = useState(false),
+    [calculating, setCalculating] = useState(true),
+    [error, setError] = useState(''),
+    [preview, setPreview] = useState<{ rows: any[]; total: number }>({ rows: [], total: 0 });
+  useEffect(() => {
+    let active = true;
+    setCalculating(true);
+    setError('');
+    setPage(1);
+    api('/calculations/preview', 'POST', {
+      type,
+      start: f.start,
+      end: f.end,
+      departmentId: f.department,
+      employeeId: f.employee,
+    })
+      .then((result) => active && setPreview({ rows: result.rows, total: result.total }))
+      .catch((e) => active && setError((e as Error).message))
+      .finally(() => active && setCalculating(false));
+    return () => {
+      active = false;
+    };
+  }, [type, f.start, f.end, f.department, f.employee]);
+  const rows = preview.rows,
+    total = preview.total;
   const title =
     type === 'va' ? 'Vale-alimentação' : type === 'vt' ? 'Vale-transporte' : 'Adicional noturno';
   const headers =
@@ -74,7 +89,8 @@ export default function Benefits({ type }: { type: 'va' | 'vt' | 'night' }) {
               Regras de cálculo
             </Link>
             <Button
-              busy={busy}
+              busy={busy || calculating}
+              disabled={calculating || !!error}
               onClick={async () => {
                 setBusy(true);
                 try {
@@ -100,6 +116,8 @@ export default function Benefits({ type }: { type: 'va' | 'vt' | 'night' }) {
         }
       />
       <PeriodFilter employee />
+      {error && <Notice tone="red">{error}</Notice>}
+      {calculating && <Notice>Calculando a prévia no servidor…</Notice>}
       <Notice tone="orange">
         <Calculator size={18} />
         <span>
