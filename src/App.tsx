@@ -55,6 +55,11 @@ const nav = [
   ['/relatorios', 'Relatórios', FileBarChart2],
   ['/configuracoes', 'Configurações', Settings],
 ] as const;
+const navGroups = [
+  { id: 'jornada', label: 'JORNADA & PONTO', items: nav.slice(3, 6) },
+  { id: 'beneficios', label: 'BENEFÍCIOS & FECHAMENTO', items: nav.slice(6, 10) },
+  { id: 'admin', label: 'ADMINISTRAÇÃO', items: nav.slice(10) },
+] as const;
 function Login({ onLogin }: { onLogin: (u: User) => void }) {
   const [forgot, setForgot] = useState(false),
     [busy, setBusy] = useState(false),
@@ -64,7 +69,7 @@ function Login({ onLogin }: { onLogin: (u: User) => void }) {
     <div className="login-screen">
       <section className="login-story">
         <div className="login-brand">
-          DHO<span>CONTROL</span>
+          DP<span>CONTROL</span>
         </div>
         <div>
           <span className="login-eyebrow">PESSOAS NO CENTRO. GESTÃO NO CONTROLE.</span>
@@ -84,14 +89,14 @@ function Login({ onLogin }: { onLogin: (u: User) => void }) {
             <ShieldCheck /> Informação organizada, decisões com confiança.
           </div>
         </div>
-        <small>Uma plataforma Credlar · Gestão Humana e Organizacional</small>
+        <small>DPControl · Gestão Humana e Organizacional</small>
         <div className="orb one" />
         <div className="orb two" />
       </section>
       <section className="login-form">
         <div className="login-card">
-          <img src="/logos/credlar.png" className="login-logo" alt="Credlar Vacation" />
-          <span className="eyebrow">BEM-VINDO AO DHO CONTROL</span>
+          <img src="/logos/credlar.png" className="login-logo" alt="DPControl" />
+          <span className="eyebrow">BEM-VINDO AO DPCONTROL</span>
           <h2>{forgot ? 'Recuperar acesso' : 'Seu trabalho começa aqui.'}</h2>
           <p>
             {forgot
@@ -181,6 +186,7 @@ export default function App() {
     [loading, setLoading] = useState(true),
     [loadError, setLoadError] = useState(''),
     [collapsed, setCollapsed] = useState(false),
+    [openMenu, setOpenMenu] = useState('jornada'),
     [toast, setToast] = useState<{ message: string; tone: string } | null>(null),
     [help, setHelp] = useState(false),
     [notices, setNotices] = useState(false),
@@ -241,7 +247,7 @@ export default function App() {
     return (
       <div className="loading-screen">
         <LoaderCircle className="spin" />
-        Carregando DHO CONTROL…
+        Carregando DPControl…
       </div>
     );
   if (!user)
@@ -300,26 +306,36 @@ export default function App() {
             <ChevronDown size={14} />
           </div>
           <nav aria-label="Menu principal">
-            {nav.map(([path, label, Icon], i) => (
-              <div key={path}>
-                {(i === 0 || i === 3 || i === 6 || i === 10) && (
-                  <span className="nav-section">
-                    {i === 0
-                      ? 'PRINCIPAL'
-                      : i === 3
-                        ? 'JORNADA & PONTO'
-                        : i === 6
-                          ? 'BENEFÍCIOS & FECHAMENTO'
-                          : 'ADMINISTRAÇÃO'}
-                  </span>
-                )}
-                <NavLink to={path} end title={label}>
+            <div className="nav-primary-items">
+              {nav.slice(0, 3).map(([path, label, Icon]) => (
+                <NavLink to={path} end title={label} key={path}>
                   <Icon size={19} />
                   <span>{label}</span>
-                  {path === '/ocorrencias' && pending.length > 0 && <b>{pending.length}</b>}
                 </NavLink>
-              </div>
-            ))}
+              ))}
+            </div>
+            {navGroups.map((group) => {
+              const isOpen = openMenu === group.id;
+              return (
+                <div className="nav-dropdown" key={group.id}>
+                  <button className={`nav-section-toggle ${isOpen ? 'open' : ''}`} onClick={() => setOpenMenu(isOpen ? '' : group.id)}>
+                    <span>{group.label}</span>
+                    <ChevronDown size={14} />
+                  </button>
+                  {isOpen && (
+                    <div className="nav-dropdown-items">
+                      {group.items.map(([path, label, Icon]) => (
+                        <NavLink to={path} end title={label} key={path}>
+                          <Icon size={19} />
+                          <span>{label}</span>
+                          {path === '/ocorrencias' && pending.length > 0 && <b>{pending.length}</b>}
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </nav>
           <div className="sidebar-bottom">
             <button onClick={() => setHelp(true)}>
@@ -328,7 +344,7 @@ export default function App() {
               <ArrowRight size={15} />
             </button>
             <div className="sidebar-company">
-              <img src="/logos/credlar.png" alt="Credlar Vacation" />
+              <img src="/logos/credlar.png" alt="DPControl" />
               <small>Humanizando a gestão.</small>
             </div>
           </div>
@@ -469,7 +485,7 @@ export default function App() {
           </main>
           <footer className="app-footer">
             <span>
-              © 2026 DHO CONTROL <span>·</span> Uma plataforma Credlar
+              © 2026 DPControl <span>·</span> Gestão de Departamento Pessoal
             </span>
             <span>
               <span className="status-dot" /> API conectada <span>·</span>

@@ -13,7 +13,7 @@ import {
   Field,
   Notice,
 } from '../components/ui';
-import { api, initials, currency, dateBR } from '../lib/api';
+import { api, initials, currency, dateBR, formatCpf } from '../lib/api';
 import type { Employee } from '../types';
 const blank: Omit<Employee, 'id' | 'version'> = {
   name: '',
@@ -256,7 +256,13 @@ export default function Employees() {
                 />
               </Field>
               <Field label="CPF" hint="Validado pelos dígitos verificadores.">
-                <input value={editing.cpf} onChange={(e) => set('cpf', e.target.value)} />
+                <input
+                  inputMode="numeric"
+                  maxLength={14}
+                  placeholder="000.000.000-00"
+                  value={formatCpf(editing.cpf)}
+                  onChange={(e) => set('cpf', formatCpf(e.target.value))}
+                />
               </Field>
               <Field label="Gênero">
                 <select value={editing.gender} onChange={(e) => set('gender', e.target.value)}>
@@ -449,6 +455,7 @@ export default function Employees() {
           <div className="detail-grid">
             {[
               ['Departamento', data.departments.find((d) => d.id === view.departmentId)?.name],
+              ['CPF', formatCpf(view.cpf)],
               ['Situação', view.status],
               ['Admissão', dateBR(view.admissionDate)],
               ['Escala', view.scheduleName],

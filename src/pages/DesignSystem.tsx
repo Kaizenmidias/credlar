@@ -6,7 +6,7 @@ export default function DesignSystem() {
   return (
     <>
       <PageTitle
-        eyebrow="DHO CONTROL · V1.0"
+        eyebrow="DPCONTROL · V1.0"
         title="Design System"
         description="Uma linguagem visual consistente, do cadastro ao fechamento."
       />

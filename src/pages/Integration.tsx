@@ -185,7 +185,7 @@ export default function Integration() {
       />
       <div className="integration-hero card">
         <div className="solides-logo">
-          s<span>ó</span>lides<small> + DHO CONTROL</small>
+          s<span>ó</span>lides<small> + DPControl</small>
         </div>
         <div>
           <Badge tone="orange">Aguardando homologação</Badge>

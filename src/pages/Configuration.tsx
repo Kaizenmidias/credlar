@@ -103,7 +103,7 @@ export default function Configuration() {
             <>
               <h2>Empresa responsável pelo registro</h2>
               <p className="muted">
-                Nome e logo utilizados no cabeçalho de todos os relatórios. A marca DHO CONTROL
+                Nome e logo utilizados no cabeçalho de todos os relatórios. A marca DPControl
                 identifica a plataforma.
               </p>
               <fieldset disabled={!isAdmin}>

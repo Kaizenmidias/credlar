@@ -67,7 +67,7 @@ export async function exportReport(
       didDrawPage: () => {
         heading();
         doc.setFontSize(8);
-        doc.text('Documento de conferência · DHO CONTROL', 14, 202);
+        doc.text('Documento de conferência · DPControl', 14, 202);
       },
     });
     doc.save(`${filename}.pdf`);

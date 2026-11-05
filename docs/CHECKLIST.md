@@ -1,11 +1,11 @@
 # Checklist de implementação
 
-Marcar `[x]` somente com código e evidência de verificação. Itens com `[ ]` continuam pendentes, mesmo que uma interface antecipada exista. O conjunto desta entrega é frontend completo de navegação e base funcional local; não representa liberação de todas as fases em produção.
+Marcar `[x]` somente com código e evidência de verificação. Itens com `[ ]` continuam pendentes, mesmo que uma interface antecipada exista. Este arquivo é o acompanhamento oficial da implementação do DPControl; ele não representa liberação de todas as fases em produção.
 
 ## Fase 1 — Fundação
 
 - [x] F1-01 Substituir página estática por React/TypeScript e roteamento dos 12 módulos.
-- [x] F1-02 Definir API Node, adaptador SQLite local/PostgreSQL produção e tabelas iniciais.
+- [x] F1-02 Definir API Node, adaptador SQLite local/MySQL produção e tabelas iniciais.
 - [x] F1-03 Login com scrypt, sessão HttpOnly, expiração, logout e RBAC admin/rh/consulta.
 - [x] F1-04 Cadastro de usuários por administrador, ativação/inativação e revogação de sessões.
 - [x] F1-05 Funcionários: todos os campos essenciais, CPF validado, matrícula única, busca, filtros, edição e detalhe.
@@ -15,11 +15,11 @@ Marcar `[x]` somente com código e evidência de verificação. Itens com `[ ]` 
 - [x] F1-09 Histórico básico de ações e controle otimista de edição de funcionários/departamentos.
 - [x] F1-10 Dados fictícios locais, build, testes API e regras de prévia.
 - [ ] F1-11 Recuperação real por e-mail: SMTP, token descartável/expiração, revogação e testes. Atual: orientação ao administrador.
-- [ ] F1-12 Migrações versionadas e teste de integração em PostgreSQL real (o adaptador já existe).
+- [ ] F1-12 Migrações versionadas e teste de integração MySQL real; a conexão MySQL de produção está ativa, mas migrações versionadas ainda não existem.
 - [x] F1-13a Dashboard: série temporal agrupada dinamicamente no intervalo selecionado, sem datas fixas.
 - [ ] F1-13b Dashboard: faltantes/suspeitos separados e quantidade de pessoas distintas com pendências.
 - [ ] F1-14 Acessibilidade/contraste/zoom 200% homologados; paginação e agregações no servidor.
-- [ ] F1-15 Deploy seguro da nova API/banco e revisão do fluxo inicial sem credenciais de validação.
+- [x] F1-15 Deploy seguro da API/banco MySQL e revisão do fluxo inicial sem seed fictício.
 
 ## Fase 2 — Integração e auditoria
 

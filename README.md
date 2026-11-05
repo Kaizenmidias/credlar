@@ -1,6 +1,6 @@
-# DHO CONTROL · Credlar
+# DPControl · Gestão de Departamento Pessoal
 
-Aplicação própria para DHO/RH, refeita com React + TypeScript, API Node.js e banco no servidor. A identidade da plataforma é Credlar; a empresa responsável pelos registros (ex.: Merídio Broker) é configurada separadamente e identifica todos os relatórios PDF e Excel.
+Aplicação própria para DHO/RH, refeita com React + TypeScript, API Node.js e banco no servidor. A empresa responsável pelos registros é configurada separadamente e identifica todos os relatórios PDF e Excel.
 
 ## Entrega atual
 
