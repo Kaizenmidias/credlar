@@ -32,6 +32,7 @@ Marcar `[x]` somente com código e evidência de verificação. Itens com `[ ]` 
 - [ ] F2-07 Obter token autorizado, Swagger vigente e amostras anonimizadas.
 - [ ] F2-08 Criptografia AES-GCM de token, chave fora do banco, endpoint só admin e segredo nunca retornado.
 - [ ] F2-09 Testar conexão verdadeira, permissões, limites e paginação com a conta do cliente.
+- [x] F2-09a Campo administrativo para salvar token pelo front com criptografia AES-256-GCM; teste externo aguarda token novo.
 - [ ] F2-10 Importar funcionários/departamentos/escalas/pontos/ajustes/atestados/férias/afastamentos via contrato oficial validado.
 - [ ] F2-11 Job persistente, checkpoints, transação por lote, retries 429/5xx, status e cancelamento.
 - [ ] F2-12 IDs externos e deduplicação transacional; correções na origem e invalidação de revisões.

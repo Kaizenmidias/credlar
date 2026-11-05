@@ -11,6 +11,7 @@ import { seed } from './seed.mjs';
 import { hashPassword, verifyPassword, digest, validCpf } from './security.mjs';
 import { audit, benefit, nightPay, daysBetween } from '../src/domain/engine.mjs';
 import { testSolidesConnection } from './solides.mjs';
+import { decryptSecret, encryptSecret } from './secrets.mjs';
 
 const userSchema = z.object({
   name: z.string().min(2).max(120),
@@ -625,10 +626,24 @@ export async function createApp(db, { production = false, demo = false } = {}) {
     res.status(201).json({ id });
   });
   app.post('/api/integration/test', admin, async (_, res) => {
-    const result = await testSolidesConnection();
+    const saved = (await db.query('SELECT * FROM integration_credentials WHERE provider=?', ['solides'])).rows[0];
+    let token;
+    try { token = saved ? decryptSecret(saved) : undefined; }
+    catch (error) { return res.status(500).json({ message: error.message }); }
+    const result = await testSolidesConnection({ baseUrl: saved?.base_url, token });
     if (!result.configured) return res.status(422).json(result);
     if (!result.connected) return res.status(502).json(result);
     res.json({ ok: true, ...result });
+  });
+  app.put('/api/integration/credentials', admin, async (req, res) => {
+    const input = z.object({ token: z.string().trim().min(12).max(10000), baseUrl: z.string().url().default('https://employer.tangerino.com.br') }).parse(req.body);
+    const encrypted = encryptSecret(input.token);
+    const now = new Date().toISOString();
+    const current = (await db.query('SELECT id FROM integration_credentials WHERE provider=?', ['solides'])).rows[0];
+    if (current) await db.query('UPDATE integration_credentials SET base_url=?,ciphertext=?,iv=?,auth_tag=?,updated_at=? WHERE provider=?', [input.baseUrl, encrypted.ciphertext, encrypted.iv, encrypted.authTag, now, 'solides']);
+    else await db.query('INSERT INTO integration_credentials(id,provider,base_url,ciphertext,iv,auth_tag,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)', [randomUUID(), 'solides', input.baseUrl, encrypted.ciphertext, encrypted.iv, encrypted.authTag, now, now]);
+    await log(req, current ? 'update' : 'create', 'integration_credentials', 'solides');
+    res.json({ saved: true, provider: 'solides', updatedAt: now });
   });
   app.use('/api', (_, res) => res.status(404).json({ message: 'Recurso não encontrado.' }));
   app.use(express.static(resolve('dist')));

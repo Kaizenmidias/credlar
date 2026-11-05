@@ -32,6 +32,11 @@ select,
 textarea {
   font: inherit;
 }
+.password-field { position: relative; }
+.password-field input { width: 100%; padding-right: 42px; }
+.password-toggle { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; color: var(--muted); padding: 5px; display: grid; place-items: center; }
+.remember-login { display: flex; align-items: center; gap: 8px; color: #71809a; font-size: 11px; margin: 2px 0 14px; }
+.remember-login input { min-height: auto; width: 15px; height: 15px; }
 button,
 a,
 input,

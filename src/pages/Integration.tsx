@@ -28,7 +28,8 @@ export default function Integration() {
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
     [summary, setSummary] = useState(''),
-    [token, setToken] = useState('');
+    [token, setToken] = useState(''),
+    [savingToken, setSavingToken] = useState(false);
   const download = () => {
     const url = URL.createObjectURL(
       new Blob(['\uFEFF' + templates[kind]], { type: 'text/csv;charset=utf-8;' }),
@@ -214,7 +215,7 @@ export default function Integration() {
           </p>
           <Field
             label="Token de integração"
-            hint="O token não é salvo neste estágio. O armazenamento criptografado está previsto para a Fase 2."
+            hint="O token será criptografado no servidor. Ele nunca será devolvido para a tela."
           >
             <input
               type="password"
@@ -226,6 +227,19 @@ export default function Integration() {
             />
           </Field>
           <div className="button-row">
+            <Button
+              disabled={!isAdmin || !token.trim()}
+              busy={savingToken}
+              onClick={async () => {
+                setSavingToken(true);
+                try {
+                  await api('/integration/credentials', 'PUT', { token: token.trim(), baseUrl: 'https://employer.tangerino.com.br' });
+                  setToken('');
+                  notify('Token salvo com segurança no servidor.', 'green');
+                } catch (e) { notify((e as Error).message, 'red'); }
+                finally { setSavingToken(false); }
+              }}
+            >Salvar token</Button>
             <Button
               variant="secondary"
               disabled={!isAdmin}

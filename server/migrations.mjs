@@ -39,6 +39,12 @@ export const migrations = [
       }
     },
   },
+  {
+    id: '003_encrypted_integration_credentials',
+    async up(query) {
+      await query(`CREATE TABLE IF NOT EXISTS integration_credentials (id VARCHAR(191) PRIMARY KEY, provider VARCHAR(40) UNIQUE NOT NULL, base_url VARCHAR(500) NOT NULL, ciphertext MEDIUMTEXT NOT NULL, iv VARCHAR(100) NOT NULL, auth_tag VARCHAR(100) NOT NULL, created_at VARCHAR(40) NOT NULL, updated_at VARCHAR(40) NOT NULL)`);
+    },
+  },
 ];
 
 export async function runMigrations(query, driver) {

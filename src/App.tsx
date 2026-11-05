@@ -25,6 +25,8 @@ import {
   CheckCircle2,
   CalendarDays,
   HelpCircle,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { api, initials } from './lib/api';
 import { Dho } from './context';
@@ -64,7 +66,9 @@ function Login({ onLogin }: { onLogin: (u: User) => void }) {
   const [forgot, setForgot] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
-    [message, setMessage] = useState('');
+    [message, setMessage] = useState(''),
+    [showPassword, setShowPassword] = useState(false),
+    [email, setEmail] = useState(() => localStorage.getItem('dpcontrol_login_email') || '');
   return (
     <div className="login-screen">
       <section className="login-story">
@@ -113,13 +117,16 @@ function Login({ onLogin }: { onLogin: (u: User) => void }) {
                 if (forgot) {
                   const r = await api('/auth/forgot', 'POST', { email: f.get('email') });
                   setMessage(r.message);
-                } else
+                } else {
+                  if (f.get('rememberEmail') === 'on') localStorage.setItem('dpcontrol_login_email', String(f.get('email') || ''));
+                  else localStorage.removeItem('dpcontrol_login_email');
                   onLogin(
                     await api('/auth/login', 'POST', {
                       email: f.get('email'),
                       password: f.get('password'),
                     }),
                   );
+                }
               } catch (e) {
                 setError((e as Error).message);
               } finally {
@@ -134,19 +141,21 @@ function Login({ onLogin }: { onLogin: (u: User) => void }) {
                 autoComplete="username"
                 required
                 placeholder="voce@empresa.com.br"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </Field>
             {!forgot && (
               <Field label="Senha">
-                <input
-                  name="password"
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  placeholder="Digite sua senha"
-                />
+                <div className="password-field">
+                  <input name="password" type={showPassword ? 'text' : 'password'} required autoComplete="current-password" placeholder="Digite sua senha" />
+                  <button type="button" className="password-toggle" aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} onClick={() => setShowPassword(!showPassword)}>
+                    {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                  </button>
+                </div>
               </Field>
             )}
+            {!forgot && <label className="remember-login"><input type="checkbox" name="rememberEmail" defaultChecked={!!email} /> Lembrar meu e-mail neste computador</label>}
             {error && <Notice tone="red">{error}</Notice>}
             {message && <Notice>{message}</Notice>}
             <Button busy={busy} type="submit">
