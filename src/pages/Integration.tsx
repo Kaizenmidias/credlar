@@ -231,7 +231,11 @@ export default function Integration() {
               disabled={!isAdmin}
               onClick={async () => {
                 try {
-                  await api('/integration/test', 'POST');
+                  const result = await api('/integration/test', 'POST');
+                  notify(
+                    `Sólides conectada${result.activeEmployeeCount == null ? '' : ` · ${result.activeEmployeeCount} colaboradores ativos`}.`,
+                    'green',
+                  );
                 } catch (e) {
                   notify((e as Error).message, 'orange');
                 }

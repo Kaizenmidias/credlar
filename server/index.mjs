@@ -10,6 +10,7 @@ import { connectDb } from './db.mjs';
 import { seed } from './seed.mjs';
 import { hashPassword, verifyPassword, digest, validCpf } from './security.mjs';
 import { audit, benefit, nightPay, daysBetween } from '../src/domain/engine.mjs';
+import { testSolidesConnection } from './solides.mjs';
 
 const userSchema = z.object({
   name: z.string().min(2).max(120),
@@ -623,14 +624,12 @@ export async function createApp(db, { production = false, demo = false } = {}) {
     await log(req, old ? 'update' : 'create', kind, id);
     res.status(201).json({ id });
   });
-  app.post('/api/integration/test', admin, (_, res) =>
-    res
-      .status(422)
-      .json({
-        message:
-          'Conector aguardando homologação: token autorizado e contrato Swagger da sua conta. Nenhuma chamada externa foi realizada.',
-      }),
-  );
+  app.post('/api/integration/test', admin, async (_, res) => {
+    const result = await testSolidesConnection();
+    if (!result.configured) return res.status(422).json(result);
+    if (!result.connected) return res.status(502).json(result);
+    res.json({ ok: true, ...result });
+  });
   app.use('/api', (_, res) => res.status(404).json({ message: 'Recurso não encontrado.' }));
   app.use(express.static(resolve('dist')));
   app.get('/{*path}', (_, res) => res.sendFile(resolve('dist/index.html')));
