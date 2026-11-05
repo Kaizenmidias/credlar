@@ -1,4 +1,6 @@
-# Arquitetura · DHO CONTROL
+# Arquitetura · DPControl
+
+O schema é evoluído por migrações ordenadas em `server/migrations.mjs`. Cada versão aplicada é registrada na tabela `schema_migrations`; a inicialização executa somente versões pendentes e expõe a versão atual no health check.
 
 Status: base executável com entrega antecipada das interfaces das quatro fases. Sistema interno, uma única organização. Não existe assinatura, faturamento SaaS ou isolamento multitenant.
 

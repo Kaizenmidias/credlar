@@ -121,6 +121,7 @@ export async function createApp(db, { production = false, demo = false } = {}) {
     res.json({
       status: 'ok',
       database: db.driver,
+      schemaVersion: db.schemaVersion,
       environment: demo ? 'validation' : 'production',
     }),
   );

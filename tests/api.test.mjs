@@ -8,6 +8,8 @@ import { verifyPassword } from '../server/security.mjs';
 test('Fase 1: sessão, CRUD, RBAC, validação, duplicidade e histórico', async (t) => {
   process.env.TEST_DB = ':memory:';
   const db = await connectDb();
+  assert.deepEqual(db.migrationIds, ['001_base_schema']);
+  assert.equal((await db.query('SELECT id FROM schema_migrations')).rows.length, 1);
   await seed(db, { demo: true });
   const app = await createApp(db, { demo: true });
   const server = app.listen(0, '127.0.0.1');

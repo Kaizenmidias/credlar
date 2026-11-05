@@ -15,7 +15,7 @@ Marcar `[x]` somente com código e evidência de verificação. Itens com `[ ]` 
 - [x] F1-09 Histórico básico de ações e controle otimista de edição de funcionários/departamentos.
 - [x] F1-10 Dados fictícios locais, build, testes API e regras de prévia.
 - [ ] F1-11 Recuperação real por e-mail: SMTP, token descartável/expiração, revogação e testes. Atual: orientação ao administrador.
-- [ ] F1-12 Migrações versionadas e teste de integração MySQL real; a conexão MySQL de produção está ativa, mas migrações versionadas ainda não existem.
+- [x] F1-12 Migrações versionadas, registro idempotente em `schema_migrations` e aplicação verificada no MySQL de produção.
 - [x] F1-13a Dashboard: série temporal agrupada dinamicamente no intervalo selecionado, sem datas fixas.
 - [ ] F1-13b Dashboard: faltantes/suspeitos separados e quantidade de pessoas distintas com pendências.
 - [ ] F1-14 Acessibilidade/contraste/zoom 200% homologados; paginação e agregações no servidor.
