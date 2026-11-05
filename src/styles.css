@@ -382,6 +382,15 @@ small {
   height: 43px;
   object-fit: contain;
 }
+.dp-logo {
+  color: var(--navy);
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: .9;
+}
+.dp-logo span { display: block; font-size: .62em; letter-spacing: 1.2px; }
+.login-logo { font-size: 27px; margin-bottom: 12px; }
+.sidebar-logo { font-size: 15px; min-width: 53px; text-align: center; }
 .sidebar-company small {
   color: #a0a9b9;
   font-size: 8px;

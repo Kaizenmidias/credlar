@@ -95,7 +95,7 @@ function Login({ onLogin }: { onLogin: (u: User) => void }) {
       </section>
       <section className="login-form">
         <div className="login-card">
-          <img src="/logos/credlar.png" className="login-logo" alt="DPControl" />
+          <div className="dp-logo login-logo" aria-label="DPControl">DP<span>CONTROL</span></div>
           <span className="eyebrow">BEM-VINDO AO DPCONTROL</span>
           <h2>{forgot ? 'Recuperar acesso' : 'Seu trabalho começa aqui.'}</h2>
           <p>
@@ -344,7 +344,7 @@ export default function App() {
               <ArrowRight size={15} />
             </button>
             <div className="sidebar-company">
-              <img src="/logos/credlar.png" alt="DPControl" />
+              <div className="dp-logo sidebar-logo" aria-label="DPControl">DP<span>CONTROL</span></div>
               <small>Humanizando a gestão.</small>
             </div>
           </div>
