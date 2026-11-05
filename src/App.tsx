@@ -291,8 +291,8 @@ export default function App() {
               <span />
             </div>
             <div>
-              DHO<span>CONTROL</span>
-              <small>BY CREDLAR</small>
+              DP<span>CONTROL</span>
+              <small>GESTÃO DE PESSOAS</small>
             </div>
           </Link>
           <div className="workspace">
