@@ -46,7 +46,9 @@ Marcar `[x]` somente com código e evidência de verificação. Itens com `[ ]` 
 - [x] F3-03 Descontos só de ocorrências conferidas e datas sobrepostas únicas; regra compartilhada pelo backend.
 - [x] F3-04 Prévia noturna atravessando meia-noite, minutos reduzidos, percentual e memória; endpoint autenticado no servidor.
 - [x] F3-05 Memória de cálculo individual e exportação identificada como prévia; telas VA/VT/noturno consumindo exclusivamente a API autenticada de prévia.
-- [ ] F3-06 Migrar fonte de cálculo financeiro ao servidor com centavos/NUMERIC e regras com vigência.
+- [x] F3-05a Operações monetárias das prévias realizadas em centavos inteiros, incluindo totais individuais e gerais.
+- [x] F3-05b Estrutura de regras versionadas por benefício, departamento e vigência, com bloqueio de sobreposição ativa.
+- [ ] F3-06 Concluir migração dos valores contratuais de funcionário para colunas BIGINT/DECIMAL; cálculo em centavos e regras com vigência já estão no servidor.
 - [ ] F3-07 Homologar cenários reais, CCT, calendários e políticas de VA/VT separadamente.
 - [ ] F3-08 Gerar/verificar descanso dominical de acordo com escala, gênero quando juridicamente aplicável e revisão humana.
 - [ ] F3-09 Sábados efetivamente trabalhados na Sede: comprovação pela origem, sem exigir apenas lançamento manual.

@@ -26,6 +26,7 @@ const minutes = (t) => {
   return Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
 };
 const round = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+const cents = (n) => Math.round(Number(n || 0) * 100);
 export function scheduled(e, date, holidays = []) {
   return (
     date >= e.admissionDate &&
@@ -49,7 +50,9 @@ export function benefit(e, department, occurrences, start, end, company, type = 
     ),
   );
   const eligible = dates.length - deductions.length;
-  const daily = type === 'va' ? e.vaDaily : e.vtFare * e.vtTrips;
+  const dailyCents = type === 'va' ? cents(e.vaDaily) : cents(e.vtFare) * e.vtTrips;
+  const daily = dailyCents / 100;
+  const totalCents = eligible * dailyCents;
   const additional = dates.filter((d) => e.extraDays?.includes(d)).length;
   const pending = occurrences.filter(
     (o) =>
@@ -62,14 +65,16 @@ export function benefit(e, department, occurrences, start, end, company, type = 
     discounts: deductions.length,
     eligible,
     daily,
-    total: round(eligible * daily),
+    dailyCents,
+    totalCents,
+    total: totalCents / 100,
     pending,
     memory: {
       type: type.toUpperCase(),
       scheduledDates: dates,
       deductedDates: deductions,
       rule: rules,
-      formula: `(${dates.length} dias previstos − ${deductions.length} dias descontados) × ${type === 'vt' ? `${e.vtTrips} passagens × ${e.vtFare}` : e.vaDaily} = ${round(eligible * daily)}`,
+      formula: `(${dates.length} dias previstos − ${deductions.length} dias descontados) × ${type === 'vt' ? `${e.vtTrips} passagens × ${e.vtFare}` : e.vaDaily} = ${totalCents / 100}`,
       note: 'Ocorrências pendentes não descontadas. Dias sobrepostos descontados uma única vez.',
     },
   };
@@ -191,8 +196,11 @@ export function nightPay(e, punches, start, end, company) {
     if (total) memory.push({ date: p.date, minutes: total, times: p.times.join(' · ') });
   }
   const hours = actual / company.nightReducedMinutes;
-  const hourly = e.salary / company.monthlyDivisor;
-  const total = round((hours * hourly * e.nightPercent) / 100);
+  const salaryCents = cents(e.salary);
+  const hourlyCents = salaryCents / company.monthlyDivisor;
+  const totalCents = Math.round((hours * hourlyCents * e.nightPercent) / 100);
+  const hourly = hourlyCents / 100;
+  const total = totalCents / 100;
   return {
     employee: e,
     minutes: actual,
@@ -200,6 +208,7 @@ export function nightPay(e, punches, start, end, company) {
     hourly: round(hourly),
     percent: e.nightPercent,
     total,
+    totalCents,
     excluded,
     memory: {
       days: memory,

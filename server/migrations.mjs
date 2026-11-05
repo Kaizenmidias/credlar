@@ -23,6 +23,22 @@ export const migrations = [
       }
     },
   },
+  {
+    id: '002_rules_and_closings',
+    async up(query, driver) {
+      await query(`CREATE TABLE IF NOT EXISTS calculation_rules (id VARCHAR(191) PRIMARY KEY, benefit_type VARCHAR(20) NOT NULL, department_id VARCHAR(191), valid_from VARCHAR(10) NOT NULL, valid_to VARCHAR(10), data MEDIUMTEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, version INTEGER NOT NULL DEFAULT 1, created_by VARCHAR(191) NOT NULL, created_at VARCHAR(40) NOT NULL)`);
+      await query(`CREATE TABLE IF NOT EXISTS closings (id VARCHAR(191) PRIMARY KEY, competence VARCHAR(7) NOT NULL, start_date VARCHAR(10) NOT NULL, end_date VARCHAR(10) NOT NULL, department_id VARCHAR(191), status VARCHAR(20) NOT NULL, snapshot MEDIUMTEXT NOT NULL, justification MEDIUMTEXT, version INTEGER NOT NULL DEFAULT 1, created_by VARCHAR(191) NOT NULL, created_at VARCHAR(40) NOT NULL, updated_at VARCHAR(40) NOT NULL)`);
+      for (const [name, table, column] of [
+        ['rules_validity', 'calculation_rules', 'benefit_type,department_id,valid_from'],
+        ['closings_competence', 'closings', 'competence,status'],
+      ]) {
+        const sql = `CREATE INDEX ${driver === 'mysql' ? '' : 'IF NOT EXISTS '}${name} ON ${table}(${column})`;
+        await query(sql).catch((error) => {
+          if (!/duplicate|exists/i.test(error.message)) throw error;
+        });
+      }
+    },
+  },
 ];
 
 export async function runMigrations(query, driver) {

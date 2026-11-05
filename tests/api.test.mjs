@@ -8,8 +8,8 @@ import { verifyPassword } from '../server/security.mjs';
 test('Fase 1: sessão, CRUD, RBAC, validação, duplicidade e histórico', async (t) => {
   process.env.TEST_DB = ':memory:';
   const db = await connectDb();
-  assert.deepEqual(db.migrationIds, ['001_base_schema']);
-  assert.equal((await db.query('SELECT id FROM schema_migrations')).rows.length, 1);
+  assert.deepEqual(db.migrationIds, ['001_base_schema', '002_rules_and_closings']);
+  assert.equal((await db.query('SELECT id FROM schema_migrations')).rows.length, 2);
   await seed(db, { demo: true });
   const app = await createApp(db, { demo: true });
   const server = app.listen(0, '127.0.0.1');
@@ -60,8 +60,25 @@ test('Fase 1: sessão, CRUD, RBAC, validação, duplicidade e histórico', async
         assert.equal(result.data.preview, true);
         assert.equal(result.data.rows.length, 12);
         assert.equal(typeof result.data.total, 'number');
+        assert.equal(Number.isInteger(result.data.totalCents), true);
+        assert.equal(Number.isInteger(result.data.rows[0].totalCents), true);
         assert.ok(result.data.rows[0].memory.formula);
       }
+    });
+    await t.test('regras possuem vigência e impedem sobreposição ativa', async () => {
+      const rule = {
+        benefitType: 'va',
+        departmentId: boot.departments[0].id,
+        validFrom: '2026-01-01',
+        validTo: '2026-12-31',
+        active: true,
+        data: { deductions: ['Falta injustificada'], dailyCents: 3200 },
+      };
+      assert.equal((await req('/calculation-rules', 'POST', rule)).status, 201);
+      assert.equal((await req('/calculation-rules', 'POST', rule)).status, 409);
+      const rules = await req('/calculation-rules');
+      assert.equal(rules.status, 200);
+      assert.equal(rules.data[0].data.dailyCents, 3200);
     });
     await t.test('cadastro e atualização persistem; conflito de versão é impedido', async () => {
       const draft = { ...boot.employees[0], registration: 'CRTEST', name: 'Pessoa de teste' };

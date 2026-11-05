@@ -64,6 +64,14 @@ const empSchema = z.object({
   extraDays: z.array(date).default([]),
   excludedDays: z.array(date).default([]),
 });
+const ruleSchema = z.object({
+  benefitType: z.enum(['va', 'vt', 'night']),
+  departmentId: z.string().default(''),
+  validFrom: date,
+  validTo: z.union([date, z.literal('')]).default(''),
+  active: z.boolean().default(true),
+  data: z.record(z.string(), z.unknown()),
+});
 
 export async function createApp(db, { production = false, demo = false } = {}) {
   const app = express();
@@ -252,10 +260,45 @@ export async function createApp(db, { production = false, demo = false } = {}) {
       type: input.type,
       period: { start: input.start, end: input.end },
       rows,
-      total: rows.reduce((sum, row) => sum + row.total, 0),
+      totalCents: rows.reduce((sum, row) => sum + row.totalCents, 0),
+      total: rows.reduce((sum, row) => sum + row.totalCents, 0) / 100,
       preview: true,
       note: 'Prévia informativa. Homologar regras, CCT e valores antes de uso oficial.',
     });
+  });
+  app.get('/api/calculation-rules', async (_, res) => {
+    const rows = (await db.query('SELECT * FROM calculation_rules ORDER BY valid_from DESC')).rows;
+    res.json(rows.map((row) => ({
+      id: row.id,
+      benefitType: row.benefit_type,
+      departmentId: row.department_id || '',
+      validFrom: row.valid_from,
+      validTo: row.valid_to || '',
+      active: !!row.active,
+      version: row.version,
+      data: JSON.parse(row.data),
+    })));
+  });
+  app.post('/api/calculation-rules', admin, async (req, res) => {
+    const rule = ruleSchema.parse(req.body);
+    if (rule.validTo && rule.validTo < rule.validFrom)
+      return res.status(422).json({ message: 'A vigência final não pode ser anterior à inicial.' });
+    const candidates = (await db.query(
+      'SELECT * FROM calculation_rules WHERE benefit_type=? AND active=1',
+      [rule.benefitType],
+    )).rows.filter((row) => (row.department_id || '') === rule.departmentId);
+    const overlaps = candidates.some((row) =>
+      (!rule.validTo || row.valid_from <= rule.validTo) && (!row.valid_to || row.valid_to >= rule.validFrom),
+    );
+    if (overlaps)
+      return res.status(409).json({ message: 'Já existe uma regra ativa sobreposta para esta vigência.' });
+    const id = randomUUID(), now = new Date().toISOString();
+    await db.query(
+      'INSERT INTO calculation_rules(id,benefit_type,department_id,valid_from,valid_to,data,active,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?)',
+      [id, rule.benefitType, rule.departmentId || null, rule.validFrom, rule.validTo || null, JSON.stringify(rule.data), rule.active ? 1 : 0, req.user.id, now],
+    );
+    await log(req, 'create', 'calculation_rules', id, { benefitType: rule.benefitType, validFrom: rule.validFrom });
+    res.status(201).json({ id, version: 1 });
   });
   for (const [name, schema] of [
     ['employees', empSchema],
