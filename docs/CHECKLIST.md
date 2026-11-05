@@ -62,8 +62,8 @@ Marcar `[x]` somente com código e evidência de verificação. Itens com `[ ]` 
 - [x] F4-02 Conferência consolidada de funcionários, ocorrências, auditoria e totais.
 - [x] F4-03 11 relatórios PDF e Excel com logo e razão social configuradas.
 - [x] F4-04 API bloqueia fechamento definitivo enquanto motor não homologado.
-- [ ] F4-05 Máquina de estados e versões transacionais de fechamento.
-- [ ] F4-06 Snapshot imutável completo, incluindo identidade da empresa, regras e memórias.
+- [x] F4-05 Máquina inicial de estados `draft/finalized`, versão e bloqueio concorrente por estado; reabertura permanece no item F4-08.
+- [x] F4-06 Snapshot imutável de conferência com identidade da empresa, período, funcionários, memórias, totais em centavos e pendências.
 - [ ] F4-07 Exibir pendências e exigir ciência explícita/autoridade apropriada antes de finalizar.
 - [ ] F4-08 Reabrir com justificativa obrigatória e manter versão finalizada anterior consultável.
 - [ ] F4-09 Relatórios oficiais no servidor vinculados ao snapshot e histórico de geração/acesso.

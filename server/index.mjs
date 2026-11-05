@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url';
 import { connectDb } from './db.mjs';
 import { seed } from './seed.mjs';
 import { hashPassword, verifyPassword, digest, validCpf } from './security.mjs';
-import { benefit, nightPay, daysBetween } from '../src/domain/engine.mjs';
+import { audit, benefit, nightPay, daysBetween } from '../src/domain/engine.mjs';
 
 const userSchema = z.object({
   name: z.string().min(2).max(120),
@@ -299,6 +299,91 @@ export async function createApp(db, { production = false, demo = false } = {}) {
     );
     await log(req, 'create', 'calculation_rules', id, { benefitType: rule.benefitType, validFrom: rule.validFrom });
     res.status(201).json({ id, version: 1 });
+  });
+  app.get('/api/closings', async (_, res) => {
+    const rows = (await db.query('SELECT * FROM closings ORDER BY created_at DESC')).rows;
+    res.json(rows.map((row) => ({
+      id: row.id,
+      competence: row.competence,
+      start: row.start_date,
+      end: row.end_date,
+      departmentId: row.department_id || '',
+      status: row.status,
+      version: row.version,
+      justification: row.justification || '',
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      snapshot: JSON.parse(row.snapshot),
+    })));
+  });
+  app.post('/api/closings/draft', write, async (req, res) => {
+    const input = z.object({
+      competence: z.string().regex(/^\d{4}-\d{2}$/),
+      start: date,
+      end: date,
+      departmentId: z.string().default(''),
+    }).parse(req.body);
+    daysBetween(input.start, input.end);
+    const list = async (table) =>
+      (await db.query(`SELECT * FROM ${table}`)).rows.map((row) => ({ ...JSON.parse(row.data), id: row.id }));
+    const company = (await list('company'))[0];
+    const departments = await list('departments');
+    const employees = (await list('employees')).filter((employee) =>
+      !input.departmentId || employee.departmentId === input.departmentId,
+    );
+    const records = (await db.query('SELECT * FROM records')).rows.map((row) => ({
+      ...JSON.parse(row.data), kind: row.kind,
+    }));
+    const occurrences = records.filter((row) => row.kind === 'occurrences');
+    const punches = records.filter((row) => row.kind === 'punches');
+    const reviews = records.filter((row) => row.kind === 'reviews');
+    const calculations = employees.map((employee) => {
+      const department = departments.find((item) => item.id === employee.departmentId);
+      if (!department) throw Error('Departamento do funcionário não encontrado.');
+      return {
+        employee: { id: employee.id, name: employee.name, registration: employee.registration, departmentId: employee.departmentId },
+        va: benefit(employee, department, occurrences, input.start, input.end, company, 'va'),
+        vt: benefit(employee, department, occurrences, input.start, input.end, company, 'vt'),
+        night: nightPay(employee, punches, input.start, input.end, company),
+      };
+    });
+    const pendingOccurrences = occurrences.filter((item) =>
+      item.status === 'Pendente' && item.startDate <= input.end && item.endDate >= input.start &&
+      employees.some((employee) => employee.id === item.employeeId),
+    );
+    const pendingAlerts = audit(employees, punches, input.start, input.end, company, reviews)
+      .filter((item) => item.severity !== 'green' && item.status === 'Pendente');
+    const snapshot = {
+      schemaVersion: db.schemaVersion,
+      generatedAt: new Date().toISOString(),
+      company,
+      period: input,
+      calculations,
+      totals: calculations.reduce((total, item) => ({
+        vaCents: total.vaCents + item.va.totalCents,
+        vtCents: total.vtCents + item.vt.totalCents,
+        nightCents: total.nightCents + item.night.totalCents,
+      }), { vaCents: 0, vtCents: 0, nightCents: 0 }),
+      pending: { occurrences: pendingOccurrences.length, alerts: pendingAlerts.length },
+    };
+    const id = randomUUID(), now = new Date().toISOString();
+    await db.query('INSERT INTO closings(id,competence,start_date,end_date,department_id,status,snapshot,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)', [
+      id, input.competence, input.start, input.end, input.departmentId || null, 'draft', JSON.stringify(snapshot), req.user.id, now, now,
+    ]);
+    await log(req, 'create', 'closings', id, { competence: input.competence, status: 'draft' });
+    res.status(201).json({ id, status: 'draft', version: 1, snapshot });
+  });
+  app.post('/api/closings/:id/finalize', admin, async (req, res) => {
+    if (process.env.CALCULATIONS_HOMOLOGATED !== 'true')
+      return res.status(422).json({ message: 'Finalização bloqueada até a homologação formal das regras de cálculo.' });
+    const closing = (await db.query('SELECT * FROM closings WHERE id=?', [req.params.id])).rows[0];
+    if (!closing) return res.status(404).json({ message: 'Fechamento não encontrado.' });
+    const snapshot = JSON.parse(closing.snapshot);
+    if (snapshot.pending.occurrences || snapshot.pending.alerts)
+      return res.status(422).json({ message: 'Existem pendências; registre a ciência antes de finalizar.' });
+    await db.query('UPDATE closings SET status=?,version=version+1,updated_at=? WHERE id=? AND status=?', ['finalized', new Date().toISOString(), closing.id, 'draft']);
+    await log(req, 'finalize', 'closings', closing.id);
+    res.json({ ok: true });
   });
   for (const [name, schema] of [
     ['employees', empSchema],

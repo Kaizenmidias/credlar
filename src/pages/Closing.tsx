@@ -15,12 +15,12 @@ import { useDho } from '../context';
 import { Card, PageTitle, Button, Notice, Metric, Badge } from '../components/ui';
 import PeriodFilter from '../components/PeriodFilter';
 import { calculate } from '../lib/calculations';
-import { currency } from '../lib/api';
+import { api, currency } from '../lib/api';
 import { audit } from '../domain/engine.mjs';
 import { exportReport } from '../lib/export';
 export default function Closing() {
   const { data, filters: f, notify } = useDho();
-  const [prepared, setPrepared] = useState(false),
+  const [prepared, setPrepared] = useState<any>(null),
     [busy, setBusy] = useState(false);
   let c;
   try {
@@ -58,9 +58,23 @@ export default function Closing() {
         description="Do primeiro registro à última conferência. Um processo que faz sentido."
         actions={
           <Button
-            onClick={() => {
-              setPrepared(true);
-              notify('Prévia preparada. Revise todas as pendências antes de exportar.');
+            busy={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const draft = await api('/closings/draft', 'POST', {
+                  competence: f.competence,
+                  start: f.start,
+                  end: f.end,
+                  departmentId: f.department,
+                });
+                setPrepared(draft);
+                notify('Snapshot de conferência salvo. Revise as pendências antes de exportar.');
+              } catch (e) {
+                notify((e as Error).message, 'red');
+              } finally {
+                setBusy(false);
+              }
             }}
           >
             <ClipboardCheck size={17} />
@@ -178,7 +192,7 @@ export default function Closing() {
         <Card>
           <div className="table-toolbar">
             <h2>Resumo por funcionário</h2>
-            <Badge>Prévia · {f.competence}</Badge>
+            <Badge>Snapshot #{prepared.id.slice(0, 8)} · {f.competence}</Badge>
           </div>
           <div className="table-wrap">
             <table>

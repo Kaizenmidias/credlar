@@ -80,6 +80,21 @@ test('Fase 1: sessão, CRUD, RBAC, validação, duplicidade e histórico', async
       assert.equal(rules.status, 200);
       assert.equal(rules.data[0].data.dailyCents, 3200);
     });
+    await t.test('fechamento cria snapshot e mantém finalização bloqueada sem homologação', async () => {
+      const draft = await req('/closings/draft', 'POST', {
+        competence: '2026-11',
+        start: '2026-10-21',
+        end: '2026-10-31',
+        departmentId: '',
+      });
+      assert.equal(draft.status, 201);
+      assert.equal(draft.data.status, 'draft');
+      assert.equal(draft.data.snapshot.calculations.length, 12);
+      assert.equal(Number.isInteger(draft.data.snapshot.totals.vaCents), true);
+      const history = await req('/closings');
+      assert.equal(history.data[0].id, draft.data.id);
+      assert.equal((await req(`/closings/${draft.data.id}/finalize`, 'POST', {})).status, 422);
+    });
     await t.test('cadastro e atualização persistem; conflito de versão é impedido', async () => {
       const draft = { ...boot.employees[0], registration: 'CRTEST', name: 'Pessoa de teste' };
       const add = await req('/employees', 'POST', draft);
