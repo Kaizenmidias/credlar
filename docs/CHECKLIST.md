@@ -41,10 +41,10 @@ Marcar `[x]` somente com código e evidência de verificação. Itens com `[ ]` 
 
 ## Fase 3 — Cálculos
 
-- [x] F3-01 Prévia VA por datas de escala, feriados, vínculo, dias extras e exclusões individuais.
-- [x] F3-02 Prévia VT independente de VA, tarifa e passagens por pessoa.
-- [x] F3-03 Descontos só de ocorrências conferidas e datas sobrepostas únicas.
-- [x] F3-04 Prévia noturna atravessando meia-noite, minutos reduzidos, percentual e memória.
+- [x] F3-01 Prévia VA por datas de escala, feriados, vínculo, dias extras e exclusões individuais; endpoint autenticado no servidor.
+- [x] F3-02 Prévia VT independente de VA, tarifa e passagens por pessoa; endpoint autenticado no servidor.
+- [x] F3-03 Descontos só de ocorrências conferidas e datas sobrepostas únicas; regra compartilhada pelo backend.
+- [x] F3-04 Prévia noturna atravessando meia-noite, minutos reduzidos, percentual e memória; endpoint autenticado no servidor.
 - [x] F3-05 Memória de cálculo individual e exportação identificada como prévia.
 - [ ] F3-06 Migrar fonte de cálculo financeiro ao servidor com centavos/NUMERIC e regras com vigência.
 - [ ] F3-07 Homologar cenários reais, CCT, calendários e políticas de VA/VT separadamente.

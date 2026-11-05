@@ -9,6 +9,7 @@ import { pathToFileURL } from 'node:url';
 import { connectDb } from './db.mjs';
 import { seed } from './seed.mjs';
 import { hashPassword, verifyPassword, digest, validCpf } from './security.mjs';
+import { benefit, nightPay, daysBetween } from '../src/domain/engine.mjs';
 
 const userSchema = z.object({
   name: z.string().min(2).max(120),
@@ -209,6 +210,50 @@ export async function createApp(db, { production = false, demo = false } = {}) {
       })),
       user: req.user,
       demo,
+    });
+  });
+  app.post('/api/calculations/preview', write, async (req, res) => {
+    const input = z
+      .object({
+        type: z.enum(['va', 'vt', 'night']),
+        start: date,
+        end: date,
+        departmentId: z.string().default(''),
+        employeeId: z.string().default(''),
+      })
+      .parse(req.body);
+    daysBetween(input.start, input.end);
+    const list = async (table) =>
+      (await db.query(`SELECT * FROM ${table}`)).rows.map((r) => ({
+        ...JSON.parse(r.data),
+        id: r.id,
+        version: r.version,
+      }));
+    const company = (await list('company'))[0];
+    const employees = (await list('employees')).filter(
+      (e) => (!input.departmentId || e.departmentId === input.departmentId) &&
+        (!input.employeeId || e.id === input.employeeId),
+    );
+    const departments = await list('departments');
+    const records = (await db.query('SELECT * FROM records')).rows.map((r) => ({
+      ...JSON.parse(r.data),
+      kind: r.kind,
+    }));
+    const occurrences = records.filter((r) => r.kind === 'occurrences');
+    const punches = records.filter((r) => r.kind === 'punches');
+    const rows = employees.map((employee) => {
+      if (input.type === 'night') return nightPay(employee, punches, input.start, input.end, company);
+      const department = departments.find((d) => d.id === employee.departmentId);
+      if (!department) throw Error('Departamento do funcionário não encontrado.');
+      return benefit(employee, department, occurrences, input.start, input.end, company, input.type);
+    });
+    res.json({
+      type: input.type,
+      period: { start: input.start, end: input.end },
+      rows,
+      total: rows.reduce((sum, row) => sum + row.total, 0),
+      preview: true,
+      note: 'Prévia informativa. Homologar regras, CCT e valores antes de uso oficial.',
     });
   });
   for (const [name, schema] of [
