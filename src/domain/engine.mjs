@@ -118,20 +118,11 @@ export function audit(employees, punches, start, end, company, reviews = [], occ
       }
       if (new Set(times).size < times.length && !issues.includes('Marcações exatamente iguais'))
         add('Marcações repetidas');
-      const expected =
-        e.expectedPunches === 2
-          ? [e.startTime, e.endTime]
-          : e.expectedPunches === 4
-            ? [e.startTime, e.breakStart, e.breakEnd, e.endTime]
-            : [];
-      if (!expected.length) add('Escala de 6 marcações: conferir horários detalhados na origem');
-      if (
-        times.length &&
-        Math.abs(minutes(times[0]) - minutes(e.startTime)) > company.toleranceMinutes
-      )
-        add('Entrada fora do horário previsto');
-      if (!scheduled(e, date, company.holidays) && times.length)
-        add('Marcações em dia não previsto na escala');
+      const expected = e.expectedPunches === 2
+        ? ['Entrada', 'Saída']
+        : e.expectedPunches === 4
+          ? ['Entrada', 'Saída para intervalo', 'Retorno do intervalo', 'Saída']
+          : Array.from({ length: e.expectedPunches || 6 }, (_, index) => `Marcação ${index + 1}`);
       let worked = 0;
       for (let i = 0; i + 1 < normalized.length; i += 2)
         worked += normalized[i + 1] - normalized[i];
