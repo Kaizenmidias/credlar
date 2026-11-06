@@ -29,6 +29,7 @@ export default function Audit() {
   const [result, setResult] = useState<any[] | null>(null),
     [filter, setFilter] = useState('all'),
     [page, setPage] = useState(1),
+    [pageSize, setPageSize] = useState(10),
     [detail, setDetail] = useState<any>(null),
     [note, setNote] = useState(''),
     [busy, setBusy] = useState(false),
@@ -199,7 +200,7 @@ export default function Audit() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.slice((page - 1) * 8, page * 8).map((r) => (
+                  {rows.slice((page - 1) * pageSize, page * pageSize).map((r) => (
                     <tr
                       key={r.id}
                       className="clickable"
@@ -240,7 +241,7 @@ export default function Audit() {
                 </tbody>
               </table>
             </div>
-            <Pagination total={rows.length} page={page} onChange={setPage} />
+            <Pagination total={rows.length} page={page} size={pageSize} onSizeChange={setPageSize} onChange={setPage} />
           </Card>
         </>
       ) : (

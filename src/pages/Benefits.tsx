@@ -28,6 +28,7 @@ export default function Benefits({ type }: { type: 'va' | 'vt' | 'night' }) {
   const { data, filters: f, notify } = useDho();
   const [memory, setMemory] = useState<any>(null),
     [page, setPage] = useState(1),
+    [pageSize, setPageSize] = useState(10),
     [busy, setBusy] = useState(false),
     [calculating, setCalculating] = useState(true),
     [error, setError] = useState(''),
@@ -180,7 +181,7 @@ export default function Benefits({ type }: { type: 'va' | 'vt' | 'night' }) {
               </tr>
             </thead>
             <tbody>
-              {rows.slice((page - 1) * 8, page * 8).map((r: any, i: number) => (
+              {rows.slice((page - 1) * pageSize, page * pageSize).map((r: any, i: number) => (
                 <tr key={r.employee.id}>
                   <td>
                     <b>{r.employee.name}</b>
@@ -234,7 +235,7 @@ export default function Benefits({ type }: { type: 'va' | 'vt' | 'night' }) {
           <span>Total geral estimado</span>
           <strong>{currency(total)}</strong>
         </div>
-        <Pagination total={rows.length} page={page} onChange={setPage} />
+        <Pagination total={rows.length} page={page} size={pageSize} onSizeChange={setPageSize} onChange={setPage} />
       </Card>
       {memory && (
         <Modal

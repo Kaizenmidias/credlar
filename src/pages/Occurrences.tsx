@@ -11,6 +11,7 @@ export default function Occurrences() {
   const [params] = useSearchParams();
   const [type, setType] = useState(params.get('tipo') || ''),
     [page, setPage] = useState(1),
+    [pageSize, setPageSize] = useState(10),
     [edit, setEdit] = useState<any>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
@@ -101,7 +102,7 @@ export default function Occurrences() {
               </tr>
             </thead>
             <tbody>
-              {rows.slice((page - 1) * 8, page * 8).map((o) => (
+              {rows.slice((page - 1) * pageSize, page * pageSize).map((o) => (
                 <tr key={o.id}>
                   <td>
                     <b>{data.employees.find((e) => e.id === o.employeeId)?.name}</b>
@@ -138,7 +139,7 @@ export default function Occurrences() {
             </tbody>
           </table>
         </div>
-        <Pagination page={page} total={rows.length} onChange={setPage} />
+        <Pagination page={page} total={rows.length} size={pageSize} onSizeChange={setPageSize} onChange={setPage} />
       </Card>
       {edit && (
         <Modal

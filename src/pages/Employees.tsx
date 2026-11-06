@@ -75,6 +75,7 @@ export default function Employees({ contractFilter }: { contractFilter?: 'CLT' |
     [contractType, setContractType] = useState(''),
     [dept, setDept] = useState(filters.department),
     [page, setPage] = useState(1),
+    [pageSize, setPageSize] = useState(10),
     [editing, setEditing] = useState<any>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
@@ -85,7 +86,7 @@ export default function Employees({ contractFilter }: { contractFilter?: 'CLT' |
     [solidesBusy, setSolidesBusy] = useState(false),
     [solidesError, setSolidesError] = useState(''),
     [solidesSummary, setSolidesSummary] = useState('');
-  const [solidesPage, setSolidesPage] = useState(1);
+  const [solidesPage, setSolidesPage] = useState(1), [solidesPageSize, setSolidesPageSize] = useState(10);
   const selectedContractType = contractFilter || contractType;
   const rows = data.employees.filter(
     (e) =>
@@ -269,7 +270,7 @@ export default function Employees({ contractFilter }: { contractFilter?: 'CLT' |
               </tr>
             </thead>
             <tbody>
-              {rows.slice((page - 1) * 8, page * 8).map((e) => (
+              {rows.slice((page - 1) * pageSize, page * pageSize).map((e) => (
                 <tr key={e.id}>
                   <td>
                     <button className="person row-link" onClick={() => setView(e)}>
@@ -325,7 +326,7 @@ export default function Employees({ contractFilter }: { contractFilter?: 'CLT' |
             </tbody>
           </table>
         </div>
-        <Pagination page={page} total={rows.length} onChange={setPage} />
+        <Pagination page={page} total={rows.length} size={pageSize} onSizeChange={setPageSize} onChange={setPage} />
       </Card>
       {editing && (
         <Modal
@@ -553,7 +554,7 @@ export default function Employees({ contractFilter }: { contractFilter?: 'CLT' |
         {!solidesRows.length && <Notice>O sistema consultará a API usando o token salvo em Integrações.</Notice>}
         {solidesError && <Notice tone="red">{solidesError}</Notice>}
         {solidesSummary && <Notice tone="green">{solidesSummary}</Notice>}
-        {solidesRows.length > 0 && <><div className="table-wrap"><table><thead><tr><th>Nome</th><th>Matrícula</th><th>CPF</th><th>E-mail</th><th>Nascimento</th><th>Admissão</th><th>Jornada</th></tr></thead><tbody>{solidesRows.slice((solidesPage - 1) * 10, solidesPage * 10).map((row, i) => <tr key={row.id || i}><td>{row.name || row.fullName || 'Não informado'}</td><td>{row.registration || row.registrationNumber || row.id || '—'}</td><td>{formatCpf(String(row.cpf || '')) || '—'}</td><td>{row.email || '—'}</td><td>{solidesDate(row.birthDate) ? dateBR(solidesDate(row.birthDate)) : '—'}</td><td>{solidesDate(row.admissionDate) ? dateBR(solidesDate(row.admissionDate)) : '—'}</td><td>{solidesSchedule(row)}</td></tr>)}</tbody></table></div><Pagination page={solidesPage} total={solidesRows.length} size={10} onChange={setSolidesPage} /></>}
+        {solidesRows.length > 0 && <><div className="table-wrap"><table><thead><tr><th>Nome</th><th>Matrícula</th><th>CPF</th><th>E-mail</th><th>Nascimento</th><th>Admissão</th><th>Jornada</th></tr></thead><tbody>{solidesRows.slice((solidesPage - 1) * solidesPageSize, solidesPage * solidesPageSize).map((row, i) => <tr key={row.id || i}><td>{row.name || row.fullName || 'Não informado'}</td><td>{row.registration || row.registrationNumber || row.id || '—'}</td><td>{formatCpf(String(row.cpf || '')) || '—'}</td><td>{row.email || '—'}</td><td>{solidesDate(row.birthDate) ? dateBR(solidesDate(row.birthDate)) : '—'}</td><td>{solidesDate(row.admissionDate) ? dateBR(solidesDate(row.admissionDate)) : '—'}</td><td>{solidesSchedule(row)}</td></tr>)}</tbody></table></div><Pagination page={solidesPage} total={solidesRows.length} size={solidesPageSize} onSizeChange={setSolidesPageSize} onChange={setSolidesPage} /></>}
         <div className="modal-footer"><Button variant="secondary" disabled={solidesBusy} onClick={() => setSolidesOpen(false)}>Fechar</Button>{!solidesRows.length ? <Button busy={solidesBusy} onClick={previewSolides}>Buscar na Sólides</Button> : <Button busy={solidesBusy} onClick={importSolides}>Confirmar importação</Button>}</div>
       </Modal>}
       {view && (

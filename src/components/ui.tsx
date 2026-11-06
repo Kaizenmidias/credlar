@@ -187,11 +187,13 @@ export function Pagination({
   total,
   size = 8,
   onChange,
+  onSizeChange,
 }: {
   page: number;
   total: number;
   size?: number;
   onChange: (p: number) => void;
+  onSizeChange?: (size: number) => void;
 }) {
   const pages = Math.max(1, Math.ceil(total / size));
   return (
@@ -202,6 +204,7 @@ export function Pagination({
           : '0 registros'}
       </span>
       <div>
+        {onSizeChange && <label className="pagination-size">Exibir <select aria-label="Itens por página" value={size} onChange={(e) => { onSizeChange(Number(e.target.value)); onChange(1); }}><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option><option value={500}>500</option></select></label>}
         <Button
           variant="ghost small"
           disabled={page === 1}
