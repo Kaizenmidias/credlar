@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Plus, Upload, MoreHorizontal, UserRound, Briefcase, CalendarDays } from 'lucide-react';
+import { Plus, Upload, MoreHorizontal, UserRound, Briefcase, CalendarDays, RefreshCw } from 'lucide-react';
 import { useDho } from '../context';
 import {
   PageTitle,
@@ -53,7 +53,12 @@ export default function Employees() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [tab, setTab] = useState(0),
-    [view, setView] = useState<Employee | null>(null);
+    [view, setView] = useState<Employee | null>(null),
+    [solidesOpen, setSolidesOpen] = useState(false),
+    [solidesRows, setSolidesRows] = useState<any[]>([]),
+    [solidesBusy, setSolidesBusy] = useState(false),
+    [solidesError, setSolidesError] = useState(''),
+    [solidesSummary, setSolidesSummary] = useState('');
   const rows = data.employees.filter(
     (e) =>
       (e.name + e.registration + e.cpf).toLowerCase().includes(search.toLowerCase()) &&
@@ -85,6 +90,30 @@ export default function Employees() {
       setBusy(false);
     }
   };
+  const previewSolides = async () => {
+    setSolidesBusy(true); setSolidesError(''); setSolidesRows([]);
+    try {
+      const result = await api('/integration/solides/preview', 'POST', { entity: 'employees' });
+      if (!result.available) throw Error(result.message);
+      setSolidesRows(result.rows || []);
+      setSolidesSummary(`${result.count} funcionários encontrados. Confira a prévia e confirme para cadastrar.`);
+    } catch (e) { setSolidesError((e as Error).message); }
+    finally { setSolidesBusy(false); }
+  };
+  const importSolides = async () => {
+    setSolidesBusy(true); setSolidesError(''); let imported = 0; let skipped = 0;
+    try {
+      for (const row of solidesRows) {
+        const name = row.name || row.fullName || row.nome || row.employeeName;
+        const registration = String(row.registration || row.registrationNumber || row.matricula || row.id || '').trim();
+        if (!name || !registration || data.employees.some((e) => e.registration === registration)) { skipped++; continue; }
+        await api('/employees', 'POST', { ...blank, name, registration, departmentId: row.departmentId || data.departments[0]?.id || '', cpf: row.cpf || '', email: row.email || '', jobTitle: row.jobTitle || row.role || 'Revisar cargo', admissionDate: String(row.admissionDate || blank.admissionDate).slice(0, 10), salary: Number(row.salary || 0) });
+        imported++;
+      }
+      await reload(); setSolidesSummary(`${imported} importados · ${skipped} ignorados por duplicidade ou dados incompletos.`); notify('Funcionários importados da Sólides.');
+    } catch (e) { setSolidesError((e as Error).message); }
+    finally { setSolidesBusy(false); }
+  };
   return (
     <>
       <PageTitle
@@ -97,6 +126,7 @@ export default function Employees() {
               <Upload size={16} />
               Importar funcionários
             </Link>
+            {canEdit && <Button variant="secondary" onClick={() => { setSolidesOpen(true); setSolidesRows([]); setSolidesError(''); setSolidesSummary(''); }}><RefreshCw size={16} /> Importar da Sólides</Button>}
             {canEdit && (
               <Button onClick={() => edit()}>
                 <Plus size={17} />
@@ -446,6 +476,13 @@ export default function Employees() {
           </form>
         </Modal>
       )}
+      {solidesOpen && <Modal title="Importar funcionários da Sólides" description="Consulta em modo de leitura. Nada será alterado na Sólides." wide onClose={() => !solidesBusy && setSolidesOpen(false)}>
+        {!solidesRows.length && <Notice>O sistema consultará a API usando o token salvo em Integrações.</Notice>}
+        {solidesError && <Notice tone="red">{solidesError}</Notice>}
+        {solidesSummary && <Notice tone="green">{solidesSummary}</Notice>}
+        {solidesRows.length > 0 && <div className="table-wrap"><table><thead><tr>{Object.keys(solidesRows[0]).slice(0, 7).map((k) => <th key={k}>{k}</th>)}</tr></thead><tbody>{solidesRows.slice(0, 8).map((row, i) => <tr key={i}>{Object.values(row).slice(0, 7).map((v: any, j) => <td key={j}>{String(v ?? '')}</td>)}</tr>)}</tbody></table></div>}
+        <div className="modal-footer"><Button variant="secondary" disabled={solidesBusy} onClick={() => setSolidesOpen(false)}>Fechar</Button>{!solidesRows.length ? <Button busy={solidesBusy} onClick={previewSolides}>Buscar na Sólides</Button> : <Button busy={solidesBusy} onClick={importSolides}>Confirmar importação</Button>}</div>
+      </Modal>}
       {view && (
         <Modal
           title={view.name}
