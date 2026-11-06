@@ -51,6 +51,7 @@ const solidesDate = (value: unknown) => {
   return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
 };
 const solidesSchedule = (row: any) => {
+  if (row.solidesScheduleName) return row.solidesScheduleName;
   const schedule = row.currentWorkSchedule || row.workSchedule || row.schedule;
   if (!schedule) return 'Não informada';
   if (typeof schedule === 'string' || typeof schedule === 'number') return String(schedule);

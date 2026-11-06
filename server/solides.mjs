@@ -65,6 +65,18 @@ export async function importSolidesEntity({ baseUrl = DEFAULT_BASE_URL, token, e
     } while (page <= totalPages && page <= 100);
     rows = [...new Map(allRows.map((row) => [String(row?.id ?? row?.registration ?? JSON.stringify(row)), row])).values()]
       .filter((row) => row && row.fired !== true);
+    try {
+      const scheduleBody = await solidesFetch({ baseUrl, token, path: '/work-schedule', params: { page: 0, size: 100, active: true } });
+      const schedules = Array.isArray(scheduleBody) ? scheduleBody : scheduleBody?.content || scheduleBody?.data || scheduleBody?.items || [];
+      const scheduleNames = new Map(schedules.map((schedule) => [String(schedule.id), schedule.name || schedule.description || `Código ${schedule.id}`]));
+      rows = rows.map((row) => {
+        const schedule = row.currentWorkSchedule || row.workSchedule || row.schedule;
+        const scheduleId = typeof schedule === 'object' ? schedule?.id : schedule;
+        return { ...row, solidesScheduleName: scheduleNames.get(String(scheduleId)) || (scheduleId ? `Código ${scheduleId}` : '') };
+      });
+    } catch {
+      // A jornada é complementar; a importação continua mesmo sem essa consulta.
+    }
   } else {
     body = await solidesFetch({ baseUrl, token, path: operation.path, params: { page: 0, size: 500 } });
     rows = Array.isArray(body) ? body : body?.content || body?.data || body?.items || [];
