@@ -19,7 +19,9 @@ export interface Department {
   vtDeductions: string[];
   sundayPolicy: string;
   womenSundayRest: number;
+  contractType: 'CLT' | 'PJ' | 'AMBOS' | 'NAO_IDENTIFICADO';
 }
+export interface Unit { id: string; version: number; name: string; description: string; contractType: 'CLT' | 'PJ' | 'AMBOS' | 'NAO_IDENTIFICADO'; source: string; }
 export interface Employee {
   id: string;
   version: number;
@@ -80,6 +82,7 @@ export interface Data {
   company: Company;
   employees: Employee[];
   departments: Department[];
+  units: Unit[];
   records: RecordData[];
   demo: boolean;
 }

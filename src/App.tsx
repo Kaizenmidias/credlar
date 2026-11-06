@@ -35,6 +35,7 @@ import { Button, Modal, Field, Notice } from './components/ui';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
 import Departments from './pages/Departments';
+import Units from './pages/Units';
 import Integration from './pages/Integration';
 import Audit from './pages/Audit';
 import Occurrences from './pages/Occurrences';
@@ -47,6 +48,7 @@ const nav = [
   ['/', 'Dashboard', LayoutDashboard],
   ['/funcionarios', 'Funcionários', Users],
   ['/departamentos', 'Departamentos', Building2],
+  ['/unidades', 'Unidades', Building2],
   ['/integracao', 'Integração Sólides', PlugZap],
   ['/auditoria', 'Auditoria de ponto', ScanLine],
   ['/ocorrencias', 'Ocorrências', ClipboardList],
@@ -58,9 +60,9 @@ const nav = [
   ['/configuracoes', 'Configurações', Settings],
 ] as const;
 const navGroups = [
-  { id: 'jornada', label: 'JORNADA & PONTO', items: nav.slice(3, 6) },
-  { id: 'beneficios', label: 'BENEFÍCIOS & FECHAMENTO', items: nav.slice(6, 10) },
-  { id: 'admin', label: 'ADMINISTRAÇÃO', items: nav.slice(10) },
+  { id: 'jornada', label: 'JORNADA & PONTO', items: nav.slice(4, 7) },
+  { id: 'beneficios', label: 'BENEFÍCIOS & FECHAMENTO', items: nav.slice(7, 11) },
+  { id: 'admin', label: 'ADMINISTRAÇÃO', items: nav.slice(11) },
 ] as const;
 function Login({ onLogin }: { onLogin: (u: User) => void }) {
   const [forgot, setForgot] = useState(false),
@@ -316,7 +318,7 @@ export default function App() {
           </div>
           <nav aria-label="Menu principal">
             <div className="nav-primary-items">
-              {nav.slice(0, 3).map(([path, label, Icon]) => (
+              {nav.slice(0, 4).map(([path, label, Icon]) => (
                 <NavLink to={path} end title={label} key={path}>
                   <Icon size={19} />
                   <span>{label}</span>
@@ -476,6 +478,7 @@ export default function App() {
               <Route path="/funcionarios" element={<Employees contractFilter="CLT" />} />
               <Route path="/pessoa-juridica" element={<Employees contractFilter="PJ" />} />
               <Route path="/departamentos" element={<Departments />} />
+              <Route path="/unidades" element={<Units />} />
               <Route path="/integracao" element={<Integration />} />
               <Route path="/auditoria" element={<Audit />} />
               <Route path="/ocorrencias" element={<Occurrences />} />

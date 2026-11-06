@@ -33,7 +33,9 @@ const deptSchema = z.object({
   vtDeductions: z.array(z.string()),
   sundayPolicy: z.string().max(1000),
   womenSundayRest: z.number().int().min(0).max(5),
+  contractType: z.enum(['CLT', 'PJ', 'AMBOS', 'NAO_IDENTIFICADO']).default('NAO_IDENTIFICADO'),
 });
+const unitSchema = z.object({ name: z.string().min(2).max(120), description: z.string().max(1000).default(''), contractType: z.enum(['CLT', 'PJ', 'AMBOS', 'NAO_IDENTIFICADO']).default('NAO_IDENTIFICADO'), source: z.string().max(80).default('Manual') });
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const empSchema = z.object({
@@ -214,6 +216,7 @@ export async function createApp(db, { production = false, demo = false } = {}) {
       company,
       employees: await list('employees'),
       departments: await list('departments'),
+      units: await list('units'),
       records: (await db.query('SELECT * FROM records')).rows.map((r) => ({
         ...JSON.parse(r.data),
         id: r.id,
@@ -391,11 +394,12 @@ export async function createApp(db, { production = false, demo = false } = {}) {
   for (const [name, schema] of [
     ['employees', empSchema],
     ['departments', deptSchema],
+    ['units', unitSchema],
   ]) {
     app.post(
       `/api/${name}`,
       write,
-      ...(name === 'departments' ? [admin] : []),
+      ...(['departments', 'units'].includes(name) ? [admin] : []),
       async (req, res) => {
         const d = schema.parse(req.body),
           id = randomUUID();
@@ -410,12 +414,13 @@ export async function createApp(db, { production = false, demo = false } = {}) {
               JSON.stringify(d),
             ],
           );
-        else
+        else if (name === 'departments')
           await db.query('INSERT INTO departments(id,name,data) VALUES (?,?,?)', [
             id,
             d.name,
             JSON.stringify(d),
           ]);
+        else await db.query('INSERT INTO units(id,name,data) VALUES (?,?,?)', [id, d.name, JSON.stringify(d)]);
         await log(req, 'create', name, id);
         res.status(201).json({ ...d, id, version: 1 });
       },
@@ -423,14 +428,14 @@ export async function createApp(db, { production = false, demo = false } = {}) {
     app.put(
       `/api/${name}/:id`,
       write,
-      ...(name === 'departments' ? [admin] : []),
+      ...(['departments', 'units'].includes(name) ? [admin] : []),
       async (req, res) => {
         const d = schema.parse(req.body);
         const version = z.number().int().min(1).parse(req.body.version);
         const sql =
           name === 'employees'
             ? 'UPDATE employees SET registration=?,cpf=?,department_id=?,data=?,version=version+1 WHERE id=? AND version=?'
-            : 'UPDATE departments SET name=?,data=?,version=version+1 WHERE id=? AND version=?';
+          : name === 'departments' ? 'UPDATE departments SET name=?,data=?,version=version+1 WHERE id=? AND version=?' : 'UPDATE units SET name=?,data=?,version=version+1 WHERE id=? AND version=?';
         const args =
           name === 'employees'
             ? [

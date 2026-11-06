@@ -80,17 +80,17 @@ export function Modal({
   title: string;
   description?: string;
   children: ReactNode;
-  onClose: () => void;
+  onClose?: () => void;
   wide?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
-  closeRef.current = onClose;
+  closeRef.current = onClose || (() => undefined);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement;
     ref.current?.focus();
     const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeRef.current();
+      if (e.key === 'Escape') closeRef.current?.();
       if (e.key === 'Tab') {
         const els = ref.current?.querySelectorAll<HTMLElement>(
           'button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]',
@@ -117,7 +117,7 @@ export function Modal({
     <div
       className="modal-overlay"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) onClose?.();
       }}
     >
       <div
@@ -133,7 +133,7 @@ export function Modal({
             <h2>{title}</h2>
             {description && <p>{description}</p>}
           </div>
-          <button className="icon-btn" aria-label="Fechar" onClick={onClose}>
+          <button className="icon-btn" aria-label="Fechar" onClick={() => onClose?.()}>
             <X size={20} />
           </button>
         </div>
