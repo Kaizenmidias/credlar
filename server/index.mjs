@@ -639,7 +639,7 @@ export async function createApp(db, { production = false, demo = false } = {}) {
     const entity = z.enum(['employees', 'departments', 'schedules', 'punches', 'adjustments', 'occurrences']).parse(req.body?.entity);
     const saved = (await db.query('SELECT * FROM integration_credentials WHERE provider=?', ['solides'])).rows[0];
     if (!saved) return res.status(422).json({ message: 'Salve o token da Sólides antes de importar.' });
-    const token = decryptSecret({ ciphertext: saved.ciphertext, iv: saved.iv, authTag: saved.auth_tag });
+    const token = decryptSecret(saved);
     try {
       res.json(await importSolidesEntity({ baseUrl: saved.base_url, token, entity }));
     } catch (error) {
