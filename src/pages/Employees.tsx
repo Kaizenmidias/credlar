@@ -58,6 +58,13 @@ const solidesSchedule = (row: any) => {
   if (typeof schedule === 'string' || typeof schedule === 'number') return String(schedule);
   return schedule.name || schedule.description || (schedule.id ? `Código ${schedule.id}` : 'Vinculada');
 };
+const flattenSolides = (value: unknown, prefix = ''): Array<[string, string]> => {
+  if (value === null || value === undefined || value === '') return prefix ? [[prefix, '—']] : [];
+  if (Array.isArray(value)) return value.length ? value.flatMap((item, index) => flattenSolides(item, `${prefix}[${index + 1}]`)) : [[prefix, '—']];
+  if (typeof value === 'object') return Object.entries(value as Record<string, unknown>).flatMap(([key, item]) => flattenSolides(item, prefix ? `${prefix}.${key}` : key));
+  return [[prefix, String(value)]];
+};
+const solidesLabel = (key: string) => key.replace(/\[(\d+)\]/g, ' $1').split('.').map((part) => part.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (char) => char.toUpperCase())).join(' · ');
 export default function Employees({ contractFilter }: { contractFilter?: 'CLT' | 'PJ' }) {
   const { data, filters, canEdit, reload, notify } = useDho();
   const [params] = useSearchParams();
@@ -553,7 +560,7 @@ export default function Employees({ contractFilter }: { contractFilter?: 'CLT' |
               </div>
             ))}
           </div>
-          {view.solidesData && Object.keys(view.solidesData).length > 0 && <details style={{ marginTop: 20 }}><summary>Dados completos recebidos da Sólides</summary><pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, marginTop: 12 }}>{JSON.stringify(view.solidesData, null, 2)}</pre></details>}
+          {view.solidesData && Object.keys(view.solidesData).length > 0 && <details open style={{ marginTop: 20 }}><summary>Dados recebidos da Sólides ({flattenSolides(view.solidesData).length} campos)</summary><div className="detail-grid" style={{ marginTop: 12 }}>{flattenSolides(view.solidesData).map(([key, value]) => <div key={key}><small>{solidesLabel(key)}</small><strong>{value}</strong></div>)}</div></details>}
           <div className="modal-footer">
             <Button
               onClick={() => {
