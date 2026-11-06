@@ -29,7 +29,36 @@ export default function Integration() {
     [busy, setBusy] = useState(false),
     [summary, setSummary] = useState(''),
     [token, setToken] = useState(''),
-    [savingToken, setSavingToken] = useState(false);
+    [savingToken, setSavingToken] = useState(false),
+    [apiEntity, setApiEntity] = useState('employees'),
+    [apiRows, setApiRows] = useState<any[]>([]),
+    [apiBusy, setApiBusy] = useState(false),
+    [apiImporting, setApiImporting] = useState(false);
+  const previewApi = async () => {
+    setApiBusy(true); setApiRows([]); setError('');
+    try {
+      const result = await api('/integration/solides/preview', 'POST', { entity: apiEntity });
+      if (!result.available) throw Error(result.message);
+      setApiRows(result.rows || []);
+      setSummary(`${result.count} registros encontrados na operação ${result.operation.path}. Confira a prévia antes de importar.`);
+    } catch (e) { setError((e as Error).message); }
+    finally { setApiBusy(false); }
+  };
+  const confirmApiImport = async () => {
+    if (apiEntity !== 'employees') { notify('A prévia foi concluída. O mapeamento deste tipo será habilitado após a homologação do contrato.', 'orange'); return; }
+    setApiImporting(true); let imported = 0; let skipped = 0;
+    try {
+      for (const row of apiRows) {
+        const name = row.name || row.fullName || row.nome || row.employeeName;
+        const registration = String(row.registration || row.registrationNumber || row.matricula || row.id || '').trim();
+        if (!name || !registration || data.employees.some((e) => e.registration === registration)) { skipped++; continue; }
+        await api('/employees', 'POST', { name, registration, cpf: row.cpf || '', gender: row.gender || 'Não informado', departmentId: row.departmentId || '', jobTitle: row.jobTitle || row.role || 'Revisar cargo', admissionDate: String(row.admissionDate || '').slice(0, 10), terminationDate: '', salary: Number(row.salary || 0), email: row.email || '', weeklyHours: 44, scheduleName: 'Revisar escala importada', weekdays: [1,2,3,4,5], startTime: '08:00', breakStart: '12:00', breakEnd: '13:00', endTime: '17:00', expectedPunches: 4, vaDaily: 0, vtFare: 0, vtTrips: 2, nightPercent: 20, status: 'Ativo', extraDays: [], excludedDays: [] });
+        imported++;
+      }
+      await reload(); setSummary(`${imported} funcionários importados · ${skipped} ignorados por duplicidade ou dados incompletos.`); notify('Importação da Sólides concluída.', 'green');
+    } catch (e) { setError((e as Error).message); }
+    finally { setApiImporting(false); }
+  };
   const download = () => {
     const url = URL.createObjectURL(
       new Blob(['\uFEFF' + templates[kind]], { type: 'text/csv;charset=utf-8;' }),
@@ -263,6 +292,14 @@ export default function Integration() {
             Sem sincronização externa ativa. Credenciais, permissões, paginação e formatos serão
             homologados com uma conta autorizada.
           </Notice>
+          <div className="button-row" style={{ marginTop: 16 }}>
+            <select value={apiEntity} onChange={(e) => setApiEntity(e.target.value)} disabled={!isAdmin || apiBusy}>
+              <option value="employees">Funcionários</option><option value="departments">Departamentos</option><option value="schedules">Escalas</option><option value="punches">Marcações</option><option value="adjustments">Ajustes</option><option value="occurrences">Ocorrências, férias e afastamentos</option>
+            </select>
+            <Button variant="secondary" disabled={!isAdmin} busy={apiBusy} onClick={previewApi}><RefreshCw size={16} /> Importar da Sólides</Button>
+          </div>
+          {summary && apiRows.length > 0 && <Notice tone="green">{summary}</Notice>}
+          {apiRows.length > 0 && <div className="table-wrap" style={{ marginTop: 14 }}><table><thead><tr>{Object.keys(apiRows[0]).slice(0, 7).map((k) => <th key={k}>{k}</th>)}</tr></thead><tbody>{apiRows.slice(0, 5).map((row, i) => <tr key={i}>{Object.values(row).slice(0, 7).map((v: any, j) => <td key={j}>{String(v ?? '')}</td>)}</tr>)}</tbody></table><Button busy={apiImporting} onClick={confirmApiImport} disabled={!canEdit}>Confirmar importação de {apiRows.length} registros</Button></div>}
         </Card>
         <Card className="padded">
           <div className="section-icon purple">

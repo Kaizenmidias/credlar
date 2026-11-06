@@ -10,7 +10,7 @@ import { connectDb } from './db.mjs';
 import { seed } from './seed.mjs';
 import { hashPassword, verifyPassword, digest, validCpf } from './security.mjs';
 import { audit, benefit, nightPay, daysBetween } from '../src/domain/engine.mjs';
-import { testSolidesConnection } from './solides.mjs';
+import { testSolidesConnection, importSolidesEntity } from './solides.mjs';
 import { decryptSecret, encryptSecret } from './secrets.mjs';
 
 const userSchema = z.object({
@@ -634,6 +634,13 @@ export async function createApp(db, { production = false, demo = false } = {}) {
     if (!result.configured) return res.status(422).json(result);
     if (!result.connected) return res.json({ ok: false, ...result });
     res.json({ ok: true, ...result });
+  });
+  app.post('/api/integration/solides/preview', admin, async (req, res) => {
+    const entity = z.enum(['employees', 'departments', 'schedules', 'punches', 'adjustments', 'occurrences']).parse(req.body?.entity);
+    const saved = (await db.query('SELECT * FROM integration_credentials WHERE provider=?', ['solides'])).rows[0];
+    if (!saved) return res.status(422).json({ message: 'Salve o token da Sólides antes de importar.' });
+    const token = decryptSecret({ ciphertext: saved.ciphertext, iv: saved.iv, authTag: saved.auth_tag });
+    res.json(await importSolidesEntity({ baseUrl: saved.base_url, token, entity }));
   });
   app.put('/api/integration/credentials', admin, async (req, res) => {
     const input = z.object({ token: z.string().trim().min(12).max(10000), baseUrl: z.string().url().default('https://employer.tangerino.com.br') }).parse(req.body);
