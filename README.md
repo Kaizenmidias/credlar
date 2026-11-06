@@ -29,7 +29,7 @@ npm start
 
 ## Produção
 
-PostgreSQL é obrigatório em produção. Use [guia de operação](docs/OPERACAO.md), `.env.example`, `Dockerfile` e `compose.yaml`. O build não contém credenciais. Produção exige APP_ORIGIN HTTPS, DATABASE_URL e administrador inicial explícito. O contêiner não cria funcionários fictícios.
+A instalação atual utiliza MySQL no aaPanel. Use [guia de operação](docs/OPERACAO.md) e `.env.example`. O build não contém credenciais. Produção exige APP_ORIGIN HTTPS, MYSQL_URL, INTEGRATION_ENCRYPTION_KEY e administrador inicial explícito. O servidor não cria funcionários fictícios quando `SEED_DEMO=false`.
 
 O deploy anterior continua no domínio existente; esta nova arquitetura não o substitui automaticamente. Não execute o deploy da versão estática anterior: agora existe API e banco persistente.
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Users,
@@ -19,9 +19,12 @@ import { api, currency } from '../lib/api';
 import { audit } from '../domain/engine.mjs';
 import { exportReport } from '../lib/export';
 export default function Closing() {
-  const { data, filters: f, notify } = useDho();
+  const { data, filters: f, notify, isAdmin } = useDho();
   const [prepared, setPrepared] = useState<any>(null),
+    [closings, setClosings] = useState<any[]>([]),
     [busy, setBusy] = useState(false);
+  const loadClosings = () => api('/closings').then(setClosings).catch((e) => notify(e.message, 'red'));
+  useEffect(() => { loadClosings(); }, []);
   let c;
   try {
     c = calculate(data, f);
@@ -69,6 +72,7 @@ export default function Closing() {
                   departmentId: f.department,
                 });
                 setPrepared(draft);
+                await loadClosings();
                 notify('Snapshot de conferência salvo. Revise as pendências antes de exportar.');
               } catch (e) {
                 notify((e as Error).message, 'red');
@@ -224,6 +228,13 @@ export default function Closing() {
           </div>
         </Card>
       )}
+      <Card>
+        <div className="table-toolbar"><h2>Histórico de fechamentos</h2><Badge>{closings.length} versões</Badge></div>
+        <div className="table-wrap"><table><thead><tr><th>Competência</th><th>Período</th><th>Status</th><th>Versão</th><th>Pendências</th><th /></tr></thead><tbody>
+          {closings.map((closing) => <tr key={closing.id}><td><b>{closing.competence}</b></td><td>{closing.start} a {closing.end}</td><td><Badge tone={closing.status === 'finalized' ? 'green' : 'orange'}>{closing.status === 'finalized' ? 'Finalizado' : 'Rascunho'}</Badge></td><td>{closing.version}</td><td>{Number(closing.snapshot?.pending?.occurrences || 0) + Number(closing.snapshot?.pending?.alerts || 0)}</td><td>{isAdmin && closing.status === 'draft' && <Button variant="secondary" busy={busy} onClick={async () => { const pendingCount = Number(closing.snapshot?.pending?.occurrences || 0) + Number(closing.snapshot?.pending?.alerts || 0); const justification = pendingCount ? window.prompt('Há pendências. Registre a justificativa da ciência (mínimo 10 caracteres):') || '' : ''; if (pendingCount && justification.trim().length < 10) return; setBusy(true); try { await api(`/closings/${closing.id}/finalize`, 'POST', { expectedVersion: closing.version, acknowledgePending: pendingCount > 0, justification }); await loadClosings(); notify('Fechamento finalizado.', 'green'); } catch (e) { notify((e as Error).message, 'orange'); } finally { setBusy(false); } }}>Finalizar</Button>}{isAdmin && closing.status === 'finalized' && <Button variant="secondary" busy={busy} onClick={async () => { const justification = window.prompt('Justificativa obrigatória para reabertura (mínimo 10 caracteres):') || ''; if (justification.trim().length < 10) return; setBusy(true); try { await api(`/closings/${closing.id}/reopen`, 'POST', { expectedVersion: closing.version, justification }); await loadClosings(); notify('Nova versão em rascunho criada.', 'green'); } catch (e) { notify((e as Error).message, 'red'); } finally { setBusy(false); } }}>Reabrir</Button>}</td></tr>)}
+          {!closings.length && <tr><td colSpan={6} className="empty-cell">Nenhum fechamento preparado.</td></tr>}
+        </tbody></table></div>
+      </Card>
     </>
   );
 }

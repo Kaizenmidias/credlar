@@ -12,6 +12,7 @@ import { hashPassword, verifyPassword, digest, validCpf } from './security.mjs';
 import { audit, benefit, nightPay, daysBetween } from '../src/domain/engine.mjs';
 import { testSolidesConnection, importSolidesEntity, syncAllSolidesData, fetchSolidesPunches, fetchSolidesWorkSchedule } from './solides.mjs';
 import { decryptSecret, encryptSecret } from './secrets.mjs';
+import { sendPasswordReset, smtpPublic, smtpTransport } from './mail.mjs';
 
 const userSchema = z.object({
   name: z.string().min(2).max(120),
@@ -84,6 +85,13 @@ const ruleSchema = z.object({
 
 export async function createApp(db, { production = false, demo = false } = {}) {
   const app = express();
+  const cleanupExpired = () => Promise.all([
+    db.query('DELETE FROM sessions WHERE expires_at<?', [new Date().toISOString()]),
+    db.query('DELETE FROM password_resets WHERE expires_at<?', [new Date().toISOString()]),
+  ]).catch(() => {});
+  await cleanupExpired();
+  const cleanupTimer = setInterval(cleanupExpired, 60 * 60 * 1000);
+  cleanupTimer.unref?.();
   app.disable('x-powered-by');
   app.use(
     helmet({
@@ -142,6 +150,14 @@ export async function createApp(db, { production = false, demo = false } = {}) {
       environment: demo ? 'validation' : 'production',
     }),
   );
+  app.get('/api/ready', async (_, res) => {
+    try {
+      await db.query('SELECT 1 AS ready');
+      res.json({ status: 'ready', database: db.driver, schemaVersion: db.schemaVersion });
+    } catch {
+      res.status(503).json({ status: 'unavailable' });
+    }
+  });
   app.post(
     '/api/auth/login',
     rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false }),
@@ -166,10 +182,29 @@ export async function createApp(db, { production = false, demo = false } = {}) {
     },
   );
   app.post('/api/auth/forgot', rateLimit({ windowMs: 900000, limit: 5 }), async (req, res) => {
-    z.object({ email: z.string().email() }).parse(req.body);
+    const { email } = z.object({ email: z.string().email() }).parse(req.body);
+    const user = (await db.query('SELECT id,name,email FROM users WHERE email=? AND active=1', [email.toLowerCase()])).rows[0];
+    const smtp = (await db.query('SELECT * FROM smtp_settings LIMIT 1')).rows[0];
+    if (user && smtp) {
+      const token = randomBytes(32).toString('hex');
+      await db.query('DELETE FROM password_resets WHERE user_id=? OR expires_at<?', [user.id, new Date().toISOString()]);
+      await db.query('INSERT INTO password_resets(hash,user_id,expires_at) VALUES (?,?,?)', [digest(token), user.id, new Date(Date.now() + 30 * 60_000).toISOString()]);
+      const resetUrl = `${process.env.APP_ORIGIN || 'http://127.0.0.1:5173'}/?reset=${encodeURIComponent(token)}`;
+      try { await sendPasswordReset(smtp, { to: user.email, name: user.name, resetUrl }); }
+      catch (error) { console.error('Falha no envio de recuperação:', error.message); }
+    }
     res.json({
-      message: 'Solicitação recebida. Neste ambiente, solicite a redefinição ao administrador.',
+      message: 'Se o e-mail estiver cadastrado e o SMTP configurado, você receberá um link válido por 30 minutos.',
     });
+  });
+  app.post('/api/auth/reset', rateLimit({ windowMs: 900000, limit: 10 }), async (req, res) => {
+    const input = z.object({ token: z.string().min(40).max(200), password: z.string().min(12).max(128) }).parse(req.body);
+    const reset = (await db.query('SELECT * FROM password_resets WHERE hash=? AND expires_at>?', [digest(input.token), new Date().toISOString()])).rows[0];
+    if (!reset) return res.status(422).json({ message: 'Link inválido ou expirado. Solicite uma nova recuperação.' });
+    await db.query('UPDATE users SET password=? WHERE id=?', [hashPassword(input.password), reset.user_id]);
+    await db.query('DELETE FROM password_resets WHERE user_id=?', [reset.user_id]);
+    await db.query('DELETE FROM sessions WHERE user_id=?', [reset.user_id]);
+    res.json({ message: 'Senha alterada. Entre novamente com a nova senha.' });
   });
   app.use('/api', async (req, res, next) => {
     const token = req.headers.cookie
@@ -208,6 +243,26 @@ export async function createApp(db, { production = false, demo = false } = {}) {
     req.user.role !== 'consulta'
       ? next()
       : res.status(403).json({ message: 'Seu perfil permite apenas consulta.' });
+  app.get('/api/settings/smtp', admin, async (_, res) => {
+    res.json(smtpPublic((await db.query('SELECT * FROM smtp_settings LIMIT 1')).rows[0]));
+  });
+  app.put('/api/settings/smtp', admin, async (req, res) => {
+    const input = z.object({ host: z.string().min(2).max(255), port: z.number().int().min(1).max(65535), secure: z.boolean(), username: z.string().min(1).max(255), password: z.string().max(500).optional(), fromName: z.string().min(2).max(255), fromEmail: z.string().email() }).parse(req.body);
+    const current = (await db.query('SELECT * FROM smtp_settings LIMIT 1')).rows[0];
+    if (!current && !input.password) return res.status(422).json({ message: 'Informe a senha SMTP na primeira configuração.' });
+    const encrypted = input.password ? encryptSecret(input.password) : { ciphertext: current.ciphertext, iv: current.iv, authTag: current.auth_tag };
+    const id = current?.id || randomUUID(), now = new Date().toISOString();
+    if (current) await db.query('UPDATE smtp_settings SET host=?,port=?,secure=?,username=?,from_name=?,from_email=?,ciphertext=?,iv=?,auth_tag=?,updated_at=? WHERE id=?', [input.host, input.port, input.secure ? 1 : 0, input.username, input.fromName, input.fromEmail, encrypted.ciphertext, encrypted.iv, encrypted.authTag, now, id]);
+    else await db.query('INSERT INTO smtp_settings(id,host,port,secure,username,from_name,from_email,ciphertext,iv,auth_tag,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)', [id, input.host, input.port, input.secure ? 1 : 0, input.username, input.fromName, input.fromEmail, encrypted.ciphertext, encrypted.iv, encrypted.authTag, now]);
+    await log(req, current ? 'update' : 'create', 'smtp_settings', id);
+    res.json(smtpPublic((await db.query('SELECT * FROM smtp_settings WHERE id=?', [id])).rows[0]));
+  });
+  app.post('/api/settings/smtp/test', admin, async (req, res) => {
+    const current = (await db.query('SELECT * FROM smtp_settings LIMIT 1')).rows[0];
+    if (!current) return res.status(422).json({ message: 'Salve a configuração SMTP primeiro.' });
+    await smtpTransport(current).verify();
+    res.json({ ok: true, message: 'Conexão SMTP validada com sucesso.' });
+  });
   app.get('/api/bootstrap', async (req, res) => {
     const list = async (table) =>
       (await db.query(`SELECT * FROM ${table}`)).rows.map((r) => ({
@@ -389,12 +444,28 @@ export async function createApp(db, { production = false, demo = false } = {}) {
       return res.status(422).json({ message: 'Finalização bloqueada até a homologação formal das regras de cálculo.' });
     const closing = (await db.query('SELECT * FROM closings WHERE id=?', [req.params.id])).rows[0];
     if (!closing) return res.status(404).json({ message: 'Fechamento não encontrado.' });
+    const input = z.object({ expectedVersion: z.number().int().min(1), acknowledgePending: z.boolean().default(false), justification: z.string().max(2000).default('') }).parse(req.body || {});
+    if (Number(closing.version) !== input.expectedVersion) return res.status(409).json({ message: 'O fechamento foi alterado. Atualize a tela antes de continuar.' });
     const snapshot = JSON.parse(closing.snapshot);
-    if (snapshot.pending.occurrences || snapshot.pending.alerts)
-      return res.status(422).json({ message: 'Existem pendências; registre a ciência antes de finalizar.' });
-    await db.query('UPDATE closings SET status=?,version=version+1,updated_at=? WHERE id=? AND status=?', ['finalized', new Date().toISOString(), closing.id, 'draft']);
-    await log(req, 'finalize', 'closings', closing.id);
+    const hasPending = snapshot.pending.occurrences || snapshot.pending.alerts;
+    if (hasPending && (!input.acknowledgePending || input.justification.trim().length < 10))
+      return res.status(422).json({ message: 'Existem pendências. Confirme a ciência e registre uma justificativa com pelo menos 10 caracteres.' });
+    const result = await db.query('UPDATE closings SET status=?,justification=?,version=version+1,updated_at=? WHERE id=? AND status=? AND version=?', ['finalized', input.justification || null, new Date().toISOString(), closing.id, 'draft', input.expectedVersion]);
+    if (!result.rowCount) return res.status(409).json({ message: 'O fechamento não está mais disponível para finalização.' });
+    await log(req, 'finalize', 'closings', closing.id, { acknowledgePending: input.acknowledgePending, justification: input.justification });
     res.json({ ok: true });
+  });
+  app.post('/api/closings/:id/reopen', admin, async (req, res) => {
+    const input = z.object({ expectedVersion: z.number().int().min(1), justification: z.string().min(10).max(2000) }).parse(req.body || {});
+    const closing = (await db.query('SELECT * FROM closings WHERE id=?', [req.params.id])).rows[0];
+    if (!closing) return res.status(404).json({ message: 'Fechamento não encontrado.' });
+    if (closing.status !== 'finalized') return res.status(422).json({ message: 'Somente um fechamento finalizado pode ser reaberto.' });
+    if (Number(closing.version) !== input.expectedVersion) return res.status(409).json({ message: 'O fechamento foi alterado. Atualize a tela.' });
+    const id = randomUUID(), now = new Date().toISOString();
+    const snapshot = { ...JSON.parse(closing.snapshot), reopenedFrom: closing.id, reopenedAt: now, reopenJustification: input.justification };
+    await db.query('INSERT INTO closings(id,competence,start_date,end_date,department_id,status,snapshot,justification,version,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', [id, closing.competence, closing.start_date, closing.end_date, closing.department_id, 'draft', JSON.stringify(snapshot), input.justification, Number(closing.version) + 1, req.user.id, now, now]);
+    await log(req, 'reopen', 'closings', id, { previousClosingId: closing.id, justification: input.justification });
+    res.status(201).json({ id, status: 'draft', version: Number(closing.version) + 1, previousClosingId: closing.id, snapshot });
   });
   app.get('/api/job-roles', async (_, res) => {
     const rows = (await db.query('SELECT * FROM job_roles ORDER BY name')).rows.map((row) => ({ ...JSON.parse(row.data), id: row.id, name: row.name, sourceId: row.source_id || '', cbo: row.cbo || '', version: row.version }));

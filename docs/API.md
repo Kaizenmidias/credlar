@@ -7,6 +7,7 @@ Base `/api`, mesma origem HTTPS. JSON camelCase. Header `X-DHO-Request: 1` obrig
 | Método / caminho          | Permissão        | Request / resposta                                                                |
 | ------------------------- | ---------------- | --------------------------------------------------------------------------------- |
 | GET /health               | Público          | status, database, environment; sem segredo                                        |
+| GET /ready                | Público          | readiness do processo e conectividade com o banco                                 |
 | POST /auth/login          | Público limitado | `{email,password}` → usuário + cookie 8h                                          |
 | GET /auth/me              | Autenticado      | `{id,name,email,role,demo}`                                                       |
 | POST /auth/logout         | Autenticado      | revoga token atual e apaga cookie                                                 |
@@ -68,6 +69,9 @@ Datas civis ISO sem fuso; instantes de auditoria ISO UTC. Registros de ponto atu
 | Contrato próprio sugerido                               | Responsabilidade                                                        |
 | ------------------------------------------------------- | ----------------------------------------------------------------------- |
 | POST /auth/reset                                        | token de uso único + senha, sem enumeração                              |
+| GET /settings/smtp                                      | admin; configuração sem retornar a senha                                |
+| PUT /settings/smtp                                      | admin; salva host/porta/remetente e senha criptografada                  |
+| POST /settings/smtp/test                                | admin; valida conexão/autenticação SMTP                                  |
 | GET /employees?page&pageSize&search&departmentId&status | listagem paginada, total e ordenação                                    |
 | GET /dashboard?start&end&departmentId                   | agregados e séries reais                                                |
 | PUT /integrations/solides/credentials                   | criptografar token, aceitar apenas admin, nunca retorná-lo              |

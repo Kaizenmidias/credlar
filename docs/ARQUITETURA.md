@@ -10,7 +10,7 @@ Status: base executável com entrega antecipada das interfaces das quatro fases.
 | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | React 19 + TypeScript + Vite                 | Fluxos internos ricos, componentes simples e build independente da API. Sem necessidade de SSR.                             |
 | Node 22 + Express 5                          | Uma API própria e um monólito modular; menor custo operacional que microsserviços.                                          |
-| PostgreSQL em produção                       | Relacionamentos, transações e crescimento da base. SQLite no desenvolvimento permite execução local persistente sem Docker. |
+| MySQL em produção                            | Compatibilidade com a infraestrutura aaPanel existente, relacionamentos e transações. SQLite permanece nos testes locais.   |
 | SQL parametrizado                            | Nunca interpolar valores do usuário. A camada db converte placeholders para pg.                                             |
 | Cookie opaco de sessão                       | HttpOnly, SameSite Strict, Secure em produção; hash do token no banco, expiração de 8h e revogação por usuário.             |
 | Scrypt com salt aleatório                    | Senhas não reversíveis. Não usar localStorage para autenticação.                                                            |
@@ -22,7 +22,7 @@ Status: base executável com entrega antecipada das interfaces das quatro fases.
 ```mermaid
 flowchart LR
   UI[React: 12 módulos] -->|HTTPS mesma origem| API[API Node: sessão + RBAC + validação]
-  API --> DB[(PostgreSQL produção)]
+  API --> DB[(MySQL produção)]
   API --> LOG[Histórico de alterações]
   API -. Fase 2 .-> JOB[Worker de importação e deduplicação]
   JOB -. somente leitura .-> SOL[Sólides DP API oficial]
@@ -105,7 +105,7 @@ erDiagram
 
 Controles implementados: RBAC no servidor, sessão opaca/hash, hash scrypt, origem e cabeçalho anti-CSRF, consultas parametrizadas, limites de requisição no login/recuperação, JSON com limite, cabeçalhos Helmet, conflitos de versão, arquivos de ambiente e banco fora do Git.
 
-Controles ainda necessários antes de dados reais: migrações versionadas, testes reais de PostgreSQL, HTTPS/reverse proxy, rotinas de expurgo de sessões, recuperação por SMTP com token descartável, criptografia autenticada de tokens externos com chave fora do banco, storage privado com validação por assinatura e antivírus, política de retenção/documentos, segregação de funções, trilha imutável, backups cifrados e restauração comprovada. A implementação técnica isolada não atesta conformidade integral com LGPD.
+Controles já operacionais incluem migrações versionadas no MySQL, HTTPS/reverse proxy, expurgo de sessões, recuperação por SMTP com token descartável e criptografia autenticada de segredos. Ainda são necessários storage privado com validação por assinatura e antivírus, política de retenção/documentos, segregação de funções, trilha imutável, backups cifrados e restauração comprovada. A implementação técnica isolada não atesta conformidade integral com LGPD.
 
 ## Limites conhecidos
 

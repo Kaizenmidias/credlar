@@ -58,6 +58,12 @@ export const migrations = [
       await query(`CREATE TABLE IF NOT EXISTS job_roles (id VARCHAR(191) PRIMARY KEY, name VARCHAR(255) UNIQUE NOT NULL, source_id VARCHAR(191), cbo VARCHAR(120), data MEDIUMTEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1)`);
     },
   },
+  {
+    id: '006_smtp_settings',
+    async up(query) {
+      await query(`CREATE TABLE IF NOT EXISTS smtp_settings (id VARCHAR(191) PRIMARY KEY, host VARCHAR(255) NOT NULL, port INTEGER NOT NULL, secure INTEGER NOT NULL DEFAULT 1, username VARCHAR(255) NOT NULL, from_name VARCHAR(255) NOT NULL, from_email VARCHAR(255) NOT NULL, ciphertext MEDIUMTEXT NOT NULL, iv VARCHAR(100) NOT NULL, auth_tag VARCHAR(100) NOT NULL, updated_at VARCHAR(40) NOT NULL)`);
+    },
+  },
 ];
 
 export async function runMigrations(query, driver) {

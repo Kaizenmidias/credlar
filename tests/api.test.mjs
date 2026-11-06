@@ -4,12 +4,12 @@ import { once } from 'node:events';
 import { connectDb } from '../server/db.mjs';
 import { seed } from '../server/seed.mjs';
 import { createApp } from '../server/index.mjs';
-import { verifyPassword } from '../server/security.mjs';
+import { digest, verifyPassword } from '../server/security.mjs';
 test('Fase 1: sessão, CRUD, RBAC, validação, duplicidade e histórico', async (t) => {
   process.env.TEST_DB = ':memory:';
   const db = await connectDb();
-  assert.deepEqual(db.migrationIds, ['001_base_schema', '002_rules_and_closings', '003_encrypted_integration_credentials', '004_units', '005_job_roles']);
-  assert.equal((await db.query('SELECT id FROM schema_migrations')).rows.length, 5);
+  assert.deepEqual(db.migrationIds, ['001_base_schema', '002_rules_and_closings', '003_encrypted_integration_credentials', '004_units', '005_job_roles', '006_smtp_settings']);
+  assert.equal((await db.query('SELECT id FROM schema_migrations')).rows.length, 6);
   await seed(db, { demo: true });
   const app = await createApp(db, { demo: true });
   const server = app.listen(0, '127.0.0.1');
@@ -44,6 +44,16 @@ test('Fase 1: sessão, CRUD, RBAC, validação, duplicidade e histórico', async
       const u = (await db.query('SELECT password FROM users')).rows[0];
       assert.ok(verifyPassword('DhoLocal!2026', u.password));
       assert.notEqual(u.password, 'DhoLocal!2026');
+    });
+    await t.test('recuperação usa token único, expira e revoga sessões', async () => {
+      const created = await req('/users', 'POST', { name: 'Recuperação teste', email: 'reset@exemplo.invalid', role: 'rh', password: 'SenhaInicial!2026', active: true });
+      const token = 'token-de-recuperacao-seguro-com-mais-de-quarenta-caracteres';
+      await db.query('INSERT INTO password_resets(hash,user_id,expires_at) VALUES (?,?,?)', [digest(token), created.data.id, new Date(Date.now() + 60000).toISOString()]);
+      const reset = await req('/auth/reset', 'POST', { token, password: 'NovaSenhaSegura!2026' }, false);
+      assert.equal(reset.status, 200);
+      const user = (await db.query('SELECT password FROM users WHERE id=?', [created.data.id])).rows[0];
+      assert.equal(verifyPassword('NovaSenhaSegura!2026', user.password), true);
+      assert.equal((await req('/auth/reset', 'POST', { token, password: 'OutraSenhaSegura!2026' }, false)).status, 422);
     });
     const boot = (await req('/bootstrap')).data;
     assert.equal(boot.employees.length, 12);
@@ -94,6 +104,13 @@ test('Fase 1: sessão, CRUD, RBAC, validação, duplicidade e histórico', async
       const history = await req('/closings');
       assert.equal(history.data[0].id, draft.data.id);
       assert.equal((await req(`/closings/${draft.data.id}/finalize`, 'POST', {})).status, 422);
+      process.env.CALCULATIONS_HOMOLOGATED = 'true';
+      const finalized = await req(`/closings/${draft.data.id}/finalize`, 'POST', { expectedVersion: 1, acknowledgePending: true, justification: 'Pendências revisadas pelo administrador no teste.' });
+      assert.equal(finalized.status, 200);
+      const reopened = await req(`/closings/${draft.data.id}/reopen`, 'POST', { expectedVersion: 2, justification: 'Reabertura necessária para correção controlada.' });
+      assert.equal(reopened.status, 201);
+      assert.equal(reopened.data.previousClosingId, draft.data.id);
+      delete process.env.CALCULATIONS_HOMOLOGATED;
     });
     await t.test('cadastro e atualização persistem; conflito de versão é impedido', async () => {
       const draft = { ...boot.employees[0], registration: 'CRTEST', name: 'Pessoa de teste' };

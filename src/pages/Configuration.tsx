@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   MoreHorizontal,
   Trash2,
+  Mail,
 } from 'lucide-react';
 import { useDho } from '../context';
 import { Card, PageTitle, Button, Field, Notice, Modal, Badge } from '../components/ui';
@@ -26,6 +27,7 @@ export default function Configuration() {
     [history, setHistory] = useState<any[]>([]),
     [edit, setEdit] = useState<any>(null),
     [holiday, setHoliday] = useState(''),
+    [smtp, setSmtp] = useState<any>({ host: '', port: 465, secure: true, username: '', password: '', fromName: 'DPControl', fromEmail: '' }),
     [error, setError] = useState('');
   useEffect(() => {
     if (tab === 'users' && isAdmin)
@@ -36,6 +38,8 @@ export default function Configuration() {
       api('/history')
         .then(setHistory)
         .catch((e) => notify(e.message, 'red'));
+    if (tab === 'smtp' && isAdmin)
+      api('/settings/smtp').then((value) => setSmtp({ ...smtp, ...value, password: '' })).catch((e) => notify(e.message, 'red'));
   }, [tab]);
   const set = (key: string, value: any) => setCompany({ ...company, [key]: value });
   const save = async () => {
@@ -82,6 +86,7 @@ export default function Configuration() {
             ['rules', 'Regras de cálculo', Calculator],
             ['calendar', 'Calendário e feriados', CalendarDays],
             ['users', 'Usuários e permissões', Users],
+            ['smtp', 'E-mail e recuperação', Mail],
             ['history', 'Histórico de alterações', History],
           ].map(([k, l, Icon]: any) => (
             <button key={k} className={tab === k ? 'active' : ''} onClick={() => setTab(k)}>
@@ -405,6 +410,27 @@ export default function Configuration() {
                   </div>
                 ))}
               </div>
+            </>
+          )}
+          {tab === 'smtp' && (
+            <>
+              <h2>E-mail e recuperação de senha</h2>
+              <p className="muted">Configure a conta SMTP usada para enviar links de redefinição. A senha é criptografada e nunca volta para esta tela.</p>
+              {!isAdmin ? <Notice>Somente administradores podem configurar o SMTP.</Notice> : <fieldset disabled={busy}>
+                <div className="form-grid">
+                  <Field label="Servidor SMTP *"><input required value={smtp.host || ''} onChange={(e) => setSmtp({ ...smtp, host: e.target.value })} placeholder="smtp.exemplo.com" /></Field>
+                  <Field label="Porta *"><input type="number" min="1" max="65535" value={smtp.port || 465} onChange={(e) => setSmtp({ ...smtp, port: Number(e.target.value) })} /></Field>
+                  <Field label="Usuário SMTP *"><input value={smtp.username || ''} onChange={(e) => setSmtp({ ...smtp, username: e.target.value })} /></Field>
+                  <Field label={smtp.passwordConfigured ? 'Nova senha SMTP (opcional)' : 'Senha SMTP *'}><input type="password" autoComplete="new-password" value={smtp.password || ''} onChange={(e) => setSmtp({ ...smtp, password: e.target.value })} /></Field>
+                  <Field label="Nome do remetente *"><input value={smtp.fromName || ''} onChange={(e) => setSmtp({ ...smtp, fromName: e.target.value })} /></Field>
+                  <Field label="E-mail do remetente *"><input type="email" value={smtp.fromEmail || ''} onChange={(e) => setSmtp({ ...smtp, fromEmail: e.target.value })} /></Field>
+                  <Field label="Conexão segura"><label className="checkbox"><input type="checkbox" checked={!!smtp.secure} onChange={(e) => setSmtp({ ...smtp, secure: e.target.checked })} /> Usar TLS direto (normalmente porta 465)</label></Field>
+                </div>
+                <div className="button-row">
+                  <Button busy={busy} onClick={async () => { setBusy(true); try { const saved = await api('/settings/smtp', 'PUT', smtp); setSmtp({ ...smtp, ...saved, password: '' }); notify('Configuração SMTP salva.', 'green'); } catch (e) { notify((e as Error).message, 'red'); } finally { setBusy(false); } }}><Save size={16}/> Salvar SMTP</Button>
+                  <Button variant="secondary" busy={busy} onClick={async () => { setBusy(true); try { const result = await api('/settings/smtp/test', 'POST'); notify(result.message, 'green'); } catch (e) { notify((e as Error).message, 'red'); } finally { setBusy(false); } }}><ShieldCheck size={16}/> Testar conexão</Button>
+                </div>
+              </fieldset>}
             </>
           )}
         </Card>

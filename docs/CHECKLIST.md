@@ -14,11 +14,11 @@ Marcar `[x]` somente com código e evidência de verificação. Itens com `[ ]` 
 - [x] F1-08 Empresa responsável: razão social, nome, logo, dados de contato e cabeçalho documental.
 - [x] F1-09 Histórico básico de ações e controle otimista de edição de funcionários/departamentos.
 - [x] F1-10 Dados fictícios locais, build, testes API e regras de prévia.
-- [ ] F1-11 Recuperação real por e-mail: SMTP, token descartável/expiração, revogação e testes. Atual: orientação ao administrador.
+- [x] F1-11 Recuperação real por e-mail: SMTP configurável no front, senha criptografada, token hash descartável com expiração de 30 minutos, revogação de sessões e testes.
 - [x] F1-12 Migrações versionadas, registro idempotente em `schema_migrations` e aplicação verificada no MySQL de produção.
 - [x] F1-13a Dashboard: série temporal agrupada dinamicamente no intervalo selecionado, sem datas fixas.
 - [ ] F1-13b Dashboard: faltantes/suspeitos separados e quantidade de pessoas distintas com pendências.
-- [ ] F1-14 Acessibilidade/contraste/zoom 200% homologados; paginação e agregações no servidor.
+- [ ] F1-14 Acessibilidade/contraste/zoom 200% homologados e agregações no servidor. Paginação configurável 10/25/50/100/500 já disponível nas tabelas principais.
 - [x] F1-15 Deploy seguro da API/banco MySQL e revisão do fluxo inicial sem seed fictício.
 
 ## Fase 2 — Integração e auditoria
@@ -29,11 +29,11 @@ Marcar `[x]` somente com código e evidência de verificação. Itens com `[ ]` 
 - [x] F2-04 Vermelho/amarelo/verde com texto; detalhe, observação, pendente, descarte, conferido na Sólides, histórico.
 - [x] F2-05 Ocorrências manuais e normalizadas com tipo, período, origem e conferência.
 - [x] F2-06 Marcações originais imutáveis e nenhuma escrita na API Sólides.
-- [ ] F2-07 Obter token autorizado, Swagger vigente e amostras anonimizadas.
-- [ ] F2-08 Criptografia AES-GCM de token, chave fora do banco, endpoint só admin e segredo nunca retornado.
-- [ ] F2-09 Testar conexão verdadeira, permissões, limites e paginação com a conta do cliente.
+- [x] F2-07 Token autorizado, Swagger vigente e payloads reais da conta analisados.
+- [x] F2-08 Criptografia AES-GCM de token, chave fora do banco, endpoint só admin e segredo nunca retornado.
+- [x] F2-09 Conexão verdadeira, permissões e paginação testadas com a conta do cliente.
 - [x] F2-09a Campo administrativo para salvar token pelo front com criptografia AES-256-GCM; teste externo aguarda token novo.
-- [ ] F2-10 Importar funcionários/departamentos/escalas/pontos/ajustes/atestados/férias/afastamentos via contrato oficial validado.
+- [x] F2-10 Importar funcionários, departamentos, unidades, cargos, escalas, pontos e ajustes/justificativas disponibilizados pela conta, preservando payload bruto.
 - [ ] F2-11 Job persistente, checkpoints, transação por lote, retries 429/5xx, status e cancelamento.
 - [ ] F2-12 IDs externos e deduplicação transacional; correções na origem e invalidação de revisões.
 - [ ] F2-13 Mapear exportações nativas Sólides (não confundir com modelo normalizado).
@@ -65,8 +65,8 @@ Marcar `[x]` somente com código e evidência de verificação. Itens com `[ ]` 
 - [x] F4-04 API bloqueia fechamento definitivo enquanto motor não homologado.
 - [x] F4-05 Máquina inicial de estados `draft/finalized`, versão e bloqueio concorrente por estado; reabertura permanece no item F4-08.
 - [x] F4-06 Snapshot imutável de conferência com identidade da empresa, período, funcionários, memórias, totais em centavos e pendências.
-- [ ] F4-07 Exibir pendências e exigir ciência explícita/autoridade apropriada antes de finalizar.
-- [ ] F4-08 Reabrir com justificativa obrigatória e manter versão finalizada anterior consultável.
+- [x] F4-07 Exibir pendências e exigir ciência explícita, justificativa e perfil administrador antes de finalizar; finalização continua condicionada à homologação por ambiente.
+- [x] F4-08 Reabrir com justificativa obrigatória, criar nova versão em rascunho e preservar versão finalizada anterior.
 - [ ] F4-09 Relatórios oficiais no servidor vinculados ao snapshot e histórico de geração/acesso.
 - [ ] F4-10 Homologação visual PDF multipágina e Excel no leitor utilizado pelo DHO.
 
@@ -77,7 +77,8 @@ Marcar `[x]` somente com código e evidência de verificação. Itens com `[ ]` 
 - [ ] Política de retenção, finalidade, responsável, direitos do titular e gestão de incidentes.
 - [ ] Criptografia de backups, armazenamento privado, retenção e restauração testada.
 - [ ] Logs append-only com diffs mascarados; permissões por campo/dado médico.
-- [ ] Monitoramento, alarmes, health/readiness, expurgo de sessões e procedimento de rollback.
+- [x] Health/readiness e expurgo horário de sessões e tokens expirados.
+- [ ] Monitoramento externo, alarmes e procedimento de rollback ensaiado.
 - [ ] Teste de isolamento entre perfis, IDOR e limite de upload em ambiente de produção.
 - [ ] Homologação final com RH/DHO e contabilidade.
 

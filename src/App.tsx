@@ -69,7 +69,8 @@ const navGroups = [
   { id: 'admin', label: 'ADMINISTRAÇÃO', items: nav.slice(11) },
 ] as const;
 function Login({ onLogin }: { onLogin: (u: User) => void }) {
-  const [forgot, setForgot] = useState(false),
+  const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get('reset') || ''),
+    [forgot, setForgot] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [message, setMessage] = useState(''),
@@ -107,10 +108,12 @@ function Login({ onLogin }: { onLogin: (u: User) => void }) {
         <div className="login-card">
           <div className="dp-logo login-logo" aria-label="DPControl">DP<span>CONTROL</span></div>
           <span className="eyebrow">BEM-VINDO AO DPCONTROL</span>
-          <h2>{forgot ? 'Recuperar acesso' : 'Seu trabalho começa aqui.'}</h2>
+          <h2>{resetToken ? 'Criar nova senha' : forgot ? 'Recuperar acesso' : 'Seu trabalho começa aqui.'}</h2>
           <p>
-            {forgot
-              ? 'Informe seu e-mail para consultar as orientações de recuperação.'
+            {resetToken
+              ? 'Escolha uma senha segura com pelo menos 12 caracteres.'
+              : forgot
+              ? 'Informe seu e-mail para receber o link de recuperação.'
               : 'Entre com suas credenciais para acessar o painel.'}
           </p>
           <form
@@ -120,7 +123,13 @@ function Login({ onLogin }: { onLogin: (u: User) => void }) {
               setError('');
               const f = new FormData(e.currentTarget);
               try {
-                if (forgot) {
+                if (resetToken) {
+                  const password = String(f.get('password') || '');
+                  if (password !== String(f.get('confirmPassword') || '')) throw Error('As senhas não coincidem.');
+                  const r = await api('/auth/reset', 'POST', { token: resetToken, password });
+                  window.history.replaceState({}, '', '/');
+                  setResetToken(''); setMessage(r.message);
+                } else if (forgot) {
                   const r = await api('/auth/forgot', 'POST', { email: f.get('email') });
                   setMessage(r.message);
                 } else {
@@ -140,7 +149,7 @@ function Login({ onLogin }: { onLogin: (u: User) => void }) {
               }
             }}
           >
-            <Field label="E-mail de acesso">
+            {!resetToken && <Field label="E-mail de acesso">
               <input
                 name="email"
                 type="email"
@@ -150,8 +159,8 @@ function Login({ onLogin }: { onLogin: (u: User) => void }) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
-            </Field>
-            {!forgot && (
+            </Field>}
+            {(!forgot || resetToken) && (
               <Field label="Senha">
                 <div className="password-field">
                   <input name="password" type={showPassword ? 'text' : 'password'} required autoComplete="current-password" placeholder="Digite sua senha" />
@@ -161,15 +170,16 @@ function Login({ onLogin }: { onLogin: (u: User) => void }) {
                 </div>
               </Field>
             )}
-            {!forgot && <label className="remember-login"><input type="checkbox" name="rememberEmail" defaultChecked={!!email} /> Lembrar meu e-mail neste computador</label>}
+            {resetToken && <Field label="Confirmar nova senha"><input name="confirmPassword" type={showPassword ? 'text' : 'password'} required minLength={12} autoComplete="new-password" /></Field>}
+            {!forgot && !resetToken && <label className="remember-login"><input type="checkbox" name="rememberEmail" defaultChecked={!!email} /> Lembrar meu e-mail neste computador</label>}
             {error && <Notice tone="red">{error}</Notice>}
             {message && <Notice>{message}</Notice>}
             <Button busy={busy} type="submit">
-              {forgot ? 'Solicitar orientação' : 'Entrar no sistema'}
+              {resetToken ? 'Salvar nova senha' : forgot ? 'Enviar link de recuperação' : 'Entrar no sistema'}
               <ArrowRight size={17} />
             </Button>
           </form>
-          <button
+          {!resetToken && <button
             className="text-button"
             onClick={() => {
               setForgot(!forgot);
@@ -178,7 +188,7 @@ function Login({ onLogin }: { onLogin: (u: User) => void }) {
             }}
           >
             {forgot ? 'Voltar para o login' : 'Esqueci minha senha'}
-          </button>
+          </button>}
           <div className="login-trust">
             <ShieldCheck size={15} />
             Acesso restrito · Sessão protegida
