@@ -710,6 +710,8 @@ export async function createApp(db, { production = false, demo = false } = {}) {
       }
 
       const employeeRows = datasets.find((item) => item.key === 'employees')?.rows || [];
+      const jobRoles = new Map((datasets.find((item) => item.key === 'jobRoles')?.rows || []).map((row) => [String(row.id), row.description || row.name || row.title || '']));
+      const workplaces = new Map((datasets.find((item) => item.key === 'workplaces')?.rows || []).map((row) => [String(row.id), row.name || row.description || '']));
       let employeesCreated = 0;
       let employeesUpdated = 0;
       let employeesSkipped = 0;
@@ -719,7 +721,8 @@ export async function createApp(db, { production = false, demo = false } = {}) {
         if (!name || !registration) { employeesSkipped++; continue; }
         const contractText = JSON.stringify(source).toLowerCase();
         const contractType = /pessoa jur[ií]dica|prestador|\bpj\b/.test(contractText) ? 'PJ' : 'CLT';
-        const departmentName = String(source.departmentName || source.department?.name || source.departmentDTO?.name || source.costCenter?.name || 'A revisar - importação Sólides').trim();
+        const workplaceName = String(source.workplaceName || source.workplace?.name || (Array.isArray(source.workplaceList) ? source.workplaceList.map((item) => workplaces.get(String(item?.id))).filter(Boolean).join(' / ') : '')).trim();
+        const departmentName = String(source.departmentName || source.department?.name || source.departmentDTO?.name || source.costCenter?.name || workplaceName || 'A revisar - importação Sólides').trim();
         let department = (await db.query('SELECT id FROM departments WHERE LOWER(name)=LOWER(?)', [departmentName])).rows[0];
         if (!department) {
           const id = randomUUID();
@@ -727,7 +730,7 @@ export async function createApp(db, { production = false, demo = false } = {}) {
           await db.query('INSERT INTO departments(id,name,data) VALUES (?,?,?)', [id, departmentName, JSON.stringify(value)]);
           department = { id };
         }
-        const unitName = String(source.unitName || source.unit?.name || source.workplaceName || source.workplace?.name || '').trim();
+        const unitName = workplaceName;
         let unitId = '';
         if (unitName) {
           let unit = (await db.query('SELECT id FROM units WHERE LOWER(name)=LOWER(?)', [unitName])).rows[0];
@@ -741,13 +744,15 @@ export async function createApp(db, { production = false, demo = false } = {}) {
         const genderRaw = String(source.gender || source.sex || '').toLowerCase();
         const gender = genderRaw.startsWith('f') ? 'Feminino' : genderRaw.startsWith('m') ? 'Masculino' : 'Não informado';
         const schedule = source.solidesScheduleName || source.currentWorkSchedule?.name || source.workSchedule?.name || source.schedule?.name || 'Revisar escala importada';
+        const roleName = jobRoles.get(String(source.jobRoleDTO?.id || source.jobRole?.id || source.jobRoleId || '')) || '';
+        const enrichedSource = { ...source, solidesJobRoleName: roleName, solidesWorkplaceName: workplaceName };
         const draft = empSchema.parse({
           name, registration, cpf: validCpf(cpfRaw) ? cpfRaw : '', gender, departmentId: department.id, unitId,
-          jobTitle: String(source.jobTitle || source.role || source.jobRole?.name || source.jobRoleDTO?.name || source.employeeFunction?.name || 'Revisar cargo'),
+          jobTitle: String(source.jobTitle || source.role || source.jobRole?.name || source.jobRoleDTO?.name || source.employeeFunction?.name || roleName || 'Revisar cargo'),
           contractType, email: String(source.email || '').includes('@') ? String(source.email) : '', admissionDate: isoDate(source.admissionDate || source.hiringDate) || syncedAt.slice(0,10),
           terminationDate: isoDate(source.terminationDate || source.dismissalDate), salary: Number(source.salary || source.baseSalary || 0), weeklyHours: Number(source.weeklyHours || 44),
           scheduleName: String(schedule), weekdays: [1,2,3,4,5], startTime: '08:00', breakStart: '12:00', breakEnd: '13:00', endTime: '17:00', expectedPunches: 4,
-          vaDaily: 0, vtFare: 0, vtTrips: 2, nightPercent: 20, status: source.fired === true || source.active === false ? 'Desligado' : 'Ativo', extraDays: [], excludedDays: [], solidesData: source,
+          vaDaily: 0, vtFare: 0, vtTrips: 2, nightPercent: 20, status: source.fired === true || source.active === false ? 'Desligado' : 'Ativo', extraDays: [], excludedDays: [], solidesData: enrichedSource,
         });
         const existing = (await db.query('SELECT id FROM employees WHERE registration=?', [registration])).rows[0];
         if (existing) {
