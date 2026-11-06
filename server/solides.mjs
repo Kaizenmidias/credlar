@@ -45,7 +45,10 @@ export async function importSolidesEntity({ baseUrl = DEFAULT_BASE_URL, token, e
       || operations.find((item) => /^\/employee\/(find|find-all)/i.test(item.path))
     : operations.find((item) => matcher.test(`${item.path} ${item.operationId} ${item.summary} ${item.tags.join(' ')}`));
   if (!operation) return { entity, available: false, message: 'A API autorizada não publicou uma operação GET compatível para este tipo.', operations };
-  const body = await solidesFetch({ baseUrl, token, path: operation.path, params: { page: 0, size: 500 } });
+  const params = entity === 'employees'
+    ? { pageNumber: 0, pageSize: 500, showFired: 0 }
+    : { page: 0, size: 500 };
+  const body = await solidesFetch({ baseUrl, token, path: operation.path, params });
   const rows = Array.isArray(body) ? body : body?.content || body?.data || body?.items || [];
   if (entity === 'employees' && rows.length && !rows.some((row) => row && (row.name || row.fullName || row.nome || row.employeeName || row.registration || row.registrationNumber || row.matricula))) {
     throw Object.assign(new Error('A operação de funcionários retornou outro tipo de dado. Verifique a permissão do endpoint /employee/find-all na Sólides.'), { status: 422 });
