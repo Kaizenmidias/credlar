@@ -322,6 +322,10 @@ export default function App() {
                   <span>{label}</span>
                 </NavLink>
               ))}
+              <NavLink to="/pessoa-juridica" end title="Pessoa Jurídica">
+                <Users size={19} />
+                <span>Pessoa Jurídica</span>
+              </NavLink>
             </div>
             {navGroups.map((group) => {
               const isOpen = openMenu === group.id;
@@ -469,7 +473,8 @@ export default function App() {
           <main className="main-content">
             <Routes>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/funcionarios" element={<Employees />} />
+              <Route path="/funcionarios" element={<Employees contractFilter="CLT" />} />
+              <Route path="/pessoa-juridica" element={<Employees contractFilter="PJ" />} />
               <Route path="/departamentos" element={<Departments />} />
               <Route path="/integracao" element={<Integration />} />
               <Route path="/auditoria" element={<Audit />} />

@@ -56,7 +56,7 @@ const solidesSchedule = (row: any) => {
   if (typeof schedule === 'string' || typeof schedule === 'number') return String(schedule);
   return schedule.name || schedule.description || (schedule.id ? `Código ${schedule.id}` : 'Vinculada');
 };
-export default function Employees() {
+export default function Employees({ contractFilter }: { contractFilter?: 'CLT' | 'PJ' }) {
   const { data, filters, canEdit, reload, notify } = useDho();
   const [params] = useSearchParams();
   const [search, setSearch] = useState(params.get('busca') || ''),
@@ -75,11 +75,12 @@ export default function Employees() {
     [solidesError, setSolidesError] = useState(''),
     [solidesSummary, setSolidesSummary] = useState('');
   const [solidesPage, setSolidesPage] = useState(1);
+  const selectedContractType = contractFilter || contractType;
   const rows = data.employees.filter(
     (e) =>
       (e.name + e.registration + e.cpf).toLowerCase().includes(search.toLowerCase()) &&
       (!status || e.status === status) &&
-      (!contractType || (e.contractType || 'CLT') === contractType) &&
+      (!selectedContractType || (e.contractType || 'CLT') === selectedContractType) &&
       (!dept || e.departmentId === dept),
   );
   const edit = (e?: Employee) => {
@@ -138,8 +139,8 @@ export default function Employees() {
     <>
       <PageTitle
         eyebrow="PESSOAS & ORGANIZAÇÃO"
-        title="Funcionários"
-        description="Cada pessoa, sua jornada. Mantenha os dados da equipe sempre em dia."
+        title={contractFilter === 'PJ' ? 'Pessoa Jurídica' : 'Funcionários CLT'}
+        description={contractFilter === 'PJ' ? 'Prestadores de serviço cadastrados na empresa.' : 'Colaboradores CLT, jornadas e dados trabalhistas em um só lugar.'}
         actions={
           <>
             <Link to="/integracao" className="btn secondary">
@@ -207,11 +208,11 @@ export default function Employees() {
                 <option key={s}>{s}</option>
               ))}
             </select>
-            <select aria-label="Filtrar regime" value={contractType} onChange={(e) => { setContractType(e.target.value); setPage(1); }}>
+            {!contractFilter && <select aria-label="Filtrar regime" value={contractType} onChange={(e) => { setContractType(e.target.value); setPage(1); }}>
               <option value="">CLT e PJ</option>
               <option value="CLT">Somente CLT</option>
               <option value="PJ">Somente PJ</option>
-            </select>
+            </select>}
           </div>
         </div>
         <div className="table-wrap">
@@ -221,7 +222,7 @@ export default function Employees() {
                 <th>Funcionário</th>
                 <th>Departamento</th>
                 <th>Cargo</th>
-                <th>Regime</th>
+                {!contractFilter && <th>Regime</th>}
                 <th>Admissão</th>
                 <th>Jornada</th>
                 <th>Situação</th>
@@ -252,7 +253,7 @@ export default function Employees() {
                     {data.departments.find((d) => d.id === e.departmentId)?.name}
                   </td>
                   <td>{e.jobTitle}</td>
-                  <td><Badge tone={(e.contractType || 'CLT') === 'PJ' ? 'orange' : 'blue'}>{e.contractType || 'CLT'}</Badge></td>
+                  {!contractFilter && <td><Badge tone={(e.contractType || 'CLT') === 'PJ' ? 'orange' : 'blue'}>{e.contractType || 'CLT'}</Badge></td>}
                   <td>{dateBR(e.admissionDate)}</td>
                   <td>{e.weeklyHours}h / semana</td>
                   <td>
@@ -277,7 +278,7 @@ export default function Employees() {
               ))}
               {!rows.length && (
                 <tr>
-                    <td colSpan={8} className="empty-cell">
+                    <td colSpan={contractFilter ? 7 : 8} className="empty-cell">
                     Nenhum funcionário encontrado para estes filtros.
                   </td>
                 </tr>
