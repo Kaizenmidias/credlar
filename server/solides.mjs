@@ -20,6 +20,52 @@ async function solidesFetch({ baseUrl, token, path, params = {} }) {
   return body;
 }
 
+export const SOLIDES_DATASETS = [
+  ['account', 'Conta e empresa responsável', '/account'],
+  ['companies', 'Empresas e filiais', '/companies'],
+  ['costCenters', 'Centros de custo', '/cost-center/find-all'],
+  ['workplaces', 'Unidades e locais de trabalho', '/workplace/find-all'],
+  ['jobRoles', 'Cargos', '/job-role/find-all'],
+  ['employeeFunctions', 'Funções', '/employee-function'],
+  ['managers', 'Gestores', '/manager/find-all'],
+  ['workSchedules', 'Jornadas e escalas', '/work-schedule'],
+  ['punchRules', 'Regras de ponto', '/v2/punch-rule'],
+  ['holidays', 'Calendários e feriados', '/holiday-calendar/'],
+  ['adjustmentReasons', 'Motivos de ajuste', '/adjustment-reason/find-all'],
+  ['adjustments', 'Ajustes e justificativas', '/adjustment/find-all'],
+];
+
+const rowsFrom = (body) => Array.isArray(body) ? body : body?.content || body?.data || body?.items || body?.results || (body && typeof body === 'object' ? [body] : []);
+
+async function fetchAllPages({ baseUrl, token, path, params = {} }) {
+  const collected = [];
+  let page = 0;
+  let body;
+  do {
+    body = await solidesFetch({ baseUrl, token, path, params: { page, size: 500, ...params } });
+    collected.push(...rowsFrom(body));
+    const totalPages = Number(body?.totalPages || body?.page?.totalPages || 1);
+    page += 1;
+    if (page >= totalPages || page >= 200 || Array.isArray(body)) break;
+  } while (true);
+  return [...new Map(collected.map((row, index) => [String(row?.id ?? row?.code ?? row?.externalCode ?? index), row])).values()];
+}
+
+export async function syncAllSolidesData({ baseUrl = DEFAULT_BASE_URL, token }) {
+  const result = [];
+  const employees = await importSolidesEntity({ baseUrl, token, entity: 'employees' });
+  result.push({ key: 'employees', label: 'Funcionários', path: employees.operation?.path, status: 'ok', rows: employees.rows });
+  for (const [key, label, path] of SOLIDES_DATASETS) {
+    try {
+      const rows = await fetchAllPages({ baseUrl, token, path });
+      result.push({ key, label, path, status: 'ok', rows });
+    } catch (error) {
+      result.push({ key, label, path, status: 'unavailable', statusCode: Number(error.status) || null, message: error.message, rows: [] });
+    }
+  }
+  return result;
+}
+
 async function fetchSolidesSpec(baseUrl, token) {
   try {
     const response = await fetch(new URL('/v2/api-docs', baseUrl), { headers: { Accept: 'application/json' } });

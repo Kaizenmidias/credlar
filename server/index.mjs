@@ -10,7 +10,7 @@ import { connectDb } from './db.mjs';
 import { seed } from './seed.mjs';
 import { hashPassword, verifyPassword, digest, validCpf } from './security.mjs';
 import { audit, benefit, nightPay, daysBetween } from '../src/domain/engine.mjs';
-import { testSolidesConnection, importSolidesEntity } from './solides.mjs';
+import { testSolidesConnection, importSolidesEntity, syncAllSolidesData } from './solides.mjs';
 import { decryptSecret, encryptSecret } from './secrets.mjs';
 
 const userSchema = z.object({
@@ -681,6 +681,88 @@ export async function createApp(db, { production = false, demo = false } = {}) {
       res.json(await importSolidesEntity({ baseUrl: saved.base_url, token, entity }));
     } catch (error) {
       res.status(error.status && Number(error.status) >= 400 ? Number(error.status) : 502).json({ message: error.message || 'Não foi possível consultar a Sólides.' });
+    }
+  });
+  app.post('/api/integration/solides/sync-all', admin, async (req, res) => {
+    const saved = (await db.query('SELECT * FROM integration_credentials WHERE provider=?', ['solides'])).rows[0];
+    if (!saved) return res.status(422).json({ message: 'Salve o token da Sólides antes de sincronizar.' });
+    const token = decryptSecret(saved);
+    const syncedAt = new Date().toISOString();
+    const isoDate = (value) => {
+      if (!value) return '';
+      const raw = typeof value === 'number' || /^\d{11,13}$/.test(String(value)) ? new Date(Number(value)) : new Date(value);
+      return Number.isNaN(raw.getTime()) ? '' : raw.toISOString().slice(0, 10);
+    };
+    try {
+      const datasets = await syncAllSolidesData({ baseUrl: saved.base_url, token });
+      let stored = 0;
+      for (const dataset of datasets.filter((item) => item.status === 'ok')) {
+        for (let index = 0; index < dataset.rows.length; index++) {
+          const row = dataset.rows[index];
+          const externalId = String(row?.id ?? row?.code ?? row?.externalCode ?? row?.registration ?? index);
+          const externalKey = digest(`solides|${dataset.key}|${externalId}`);
+          const data = { id: externalKey, kind: `solides_${dataset.key}`, source: 'Sólides', dataset: dataset.label, externalId, syncedAt, payload: row };
+          const current = (await db.query('SELECT id FROM records WHERE external_key=?', [externalKey])).rows[0];
+          if (current) await db.query('UPDATE records SET data=?,version=version+1 WHERE id=?', [JSON.stringify(data), current.id]);
+          else await db.query('INSERT INTO records(id,kind,external_key,data) VALUES (?,?,?,?)', [externalKey, data.kind, externalKey, JSON.stringify(data)]);
+          stored++;
+        }
+      }
+
+      const employeeRows = datasets.find((item) => item.key === 'employees')?.rows || [];
+      let employeesCreated = 0;
+      let employeesUpdated = 0;
+      let employeesSkipped = 0;
+      for (const source of employeeRows) {
+        const name = String(source.name || source.fullName || source.nome || source.employeeName || '').trim();
+        const registration = String(source.registration || source.registrationNumber || source.matricula || source.id || '').trim();
+        if (!name || !registration) { employeesSkipped++; continue; }
+        const contractText = JSON.stringify(source).toLowerCase();
+        const contractType = /pessoa jur[ií]dica|prestador|\bpj\b/.test(contractText) ? 'PJ' : 'CLT';
+        const departmentName = String(source.departmentName || source.department?.name || source.departmentDTO?.name || source.costCenter?.name || 'A revisar - importação Sólides').trim();
+        let department = (await db.query('SELECT id FROM departments WHERE LOWER(name)=LOWER(?)', [departmentName])).rows[0];
+        if (!department) {
+          const id = randomUUID();
+          const value = { id, name: departmentName, manager: '', description: 'Importado automaticamente da Sólides.', color: '#3764eb', weekdays: [1,2,3,4,5], vaDeductions: ['Falta injustificada','Suspensão'], vtDeductions: ['Falta injustificada','Atestado','Férias'], sundayPolicy: 'Revisão por escala e convenção coletiva', womenSundayRest: 2, contractType };
+          await db.query('INSERT INTO departments(id,name,data) VALUES (?,?,?)', [id, departmentName, JSON.stringify(value)]);
+          department = { id };
+        }
+        const unitName = String(source.unitName || source.unit?.name || source.workplaceName || source.workplace?.name || '').trim();
+        let unitId = '';
+        if (unitName) {
+          let unit = (await db.query('SELECT id FROM units WHERE LOWER(name)=LOWER(?)', [unitName])).rows[0];
+          if (!unit) {
+            unit = { id: randomUUID() };
+            await db.query('INSERT INTO units(id,name,data) VALUES (?,?,?)', [unit.id, unitName, JSON.stringify({ id: unit.id, name: unitName, description: 'Importada automaticamente da Sólides.', contractType, source: 'Sólides' })]);
+          }
+          unitId = unit.id;
+        }
+        const cpfRaw = String(source.cpf || '').replace(/\D/g, '');
+        const genderRaw = String(source.gender || source.sex || '').toLowerCase();
+        const gender = genderRaw.startsWith('f') ? 'Feminino' : genderRaw.startsWith('m') ? 'Masculino' : 'Não informado';
+        const schedule = source.solidesScheduleName || source.currentWorkSchedule?.name || source.workSchedule?.name || source.schedule?.name || 'Revisar escala importada';
+        const draft = empSchema.parse({
+          name, registration, cpf: validCpf(cpfRaw) ? cpfRaw : '', gender, departmentId: department.id, unitId,
+          jobTitle: String(source.jobTitle || source.role || source.jobRole?.name || source.jobRoleDTO?.name || source.employeeFunction?.name || 'Revisar cargo'),
+          contractType, email: String(source.email || '').includes('@') ? String(source.email) : '', admissionDate: isoDate(source.admissionDate || source.hiringDate) || syncedAt.slice(0,10),
+          terminationDate: isoDate(source.terminationDate || source.dismissalDate), salary: Number(source.salary || source.baseSalary || 0), weeklyHours: Number(source.weeklyHours || 44),
+          scheduleName: String(schedule), weekdays: [1,2,3,4,5], startTime: '08:00', breakStart: '12:00', breakEnd: '13:00', endTime: '17:00', expectedPunches: 4,
+          vaDaily: 0, vtFare: 0, vtTrips: 2, nightPercent: 20, status: source.fired === true || source.active === false ? 'Desligado' : 'Ativo', extraDays: [], excludedDays: [], solidesData: source,
+        });
+        const existing = (await db.query('SELECT id FROM employees WHERE registration=?', [registration])).rows[0];
+        if (existing) {
+          await db.query('UPDATE employees SET cpf=?,department_id=?,data=?,version=version+1 WHERE id=?', [draft.cpf || null, draft.departmentId, JSON.stringify({ ...draft, id: existing.id }), existing.id]);
+          employeesUpdated++;
+        } else {
+          const id = randomUUID();
+          await db.query('INSERT INTO employees(id,registration,cpf,department_id,data) VALUES (?,?,?,?,?)', [id, registration, draft.cpf || null, draft.departmentId, JSON.stringify({ ...draft, id })]);
+          employeesCreated++;
+        }
+      }
+      await log(req, 'sync', 'solides', 'all', { stored, employeesCreated, employeesUpdated, employeesSkipped });
+      res.json({ syncedAt, stored, employeesCreated, employeesUpdated, employeesSkipped, datasets: datasets.map(({ rows, ...item }) => ({ ...item, count: rows.length })) });
+    } catch (error) {
+      res.status(error.status && Number(error.status) >= 400 ? Number(error.status) : 502).json({ message: error.message || 'Não foi possível sincronizar todos os dados da Sólides.' });
     }
   });
   app.put('/api/integration/credentials', admin, async (req, res) => {

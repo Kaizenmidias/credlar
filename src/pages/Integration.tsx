@@ -33,7 +33,9 @@ export default function Integration() {
     [apiEntity, setApiEntity] = useState('employees'),
     [apiRows, setApiRows] = useState<any[]>([]),
     [apiBusy, setApiBusy] = useState(false),
-    [apiImporting, setApiImporting] = useState(false);
+    [apiImporting, setApiImporting] = useState(false),
+    [syncingAll, setSyncingAll] = useState(false),
+    [syncResult, setSyncResult] = useState<any>(null);
   const previewApi = async () => {
     setApiBusy(true); setApiRows([]); setError('');
     try {
@@ -289,9 +291,20 @@ export default function Integration() {
             </Button>
           </div>
           <Notice>
-            Sem sincronização externa ativa. Credenciais, permissões, paginação e formatos serão
-            homologados com uma conta autorizada.
+            O token fica criptografado no servidor. A sincronização é somente de leitura e não altera nenhum registro na Sólides.
           </Notice>
+          <div className="button-row" style={{ marginTop: 16 }}>
+            <Button disabled={!isAdmin} busy={syncingAll} onClick={async () => {
+              setSyncingAll(true); setError(''); setSyncResult(null);
+              try {
+                const result = await api('/integration/solides/sync-all', 'POST');
+                setSyncResult(result); await reload();
+                notify(`Sincronização concluída: ${result.employeesCreated} novos e ${result.employeesUpdated} atualizados.`, 'green');
+              } catch (e) { setError((e as Error).message); notify((e as Error).message, 'red'); }
+              finally { setSyncingAll(false); }
+            }}><RefreshCw size={16}/> Sincronizar todos os dados disponíveis</Button>
+          </div>
+          {syncResult && <div style={{ marginTop: 16 }}><Notice tone="green">{syncResult.stored} registros preservados integralmente · {syncResult.employeesCreated} funcionários criados · {syncResult.employeesUpdated} atualizados.</Notice><div className="capability-grid" style={{ marginTop: 12 }}>{syncResult.datasets.map((item: any) => <div key={item.key}><ShieldCheck size={18}/><b>{item.label}</b><Badge tone={item.status === 'ok' ? 'green' : 'orange'}>{item.status === 'ok' ? `${item.count} registros` : `Sem permissão${item.statusCode ? ` · HTTP ${item.statusCode}` : ''}`}</Badge></div>)}</div></div>}
           <div className="button-row" style={{ marginTop: 16 }}>
             <select value={apiEntity} onChange={(e) => setApiEntity(e.target.value)} disabled={!isAdmin || apiBusy}>
               <option value="employees">Funcionários</option><option value="departments">Departamentos</option><option value="schedules">Escalas</option><option value="punches">Marcações</option><option value="adjustments">Ajustes</option><option value="occurrences">Ocorrências, férias e afastamentos</option>
@@ -336,22 +349,24 @@ export default function Integration() {
         </Card>
       </div>
       <Card className="padded">
-        <h2>Escopo de leitura planejado</h2>
+        <h2>Dados incluídos na sincronização completa</h2>
         <div className="capability-grid">
           {[
             'Funcionários',
-            'Departamentos / locais',
-            'Escalas',
-            'Marcações de ponto',
+            'Empresas e filiais',
+            'Departamentos, unidades e locais',
+            'Cargos, funções e gestores',
+            'Centros de custo',
+            'Jornadas e escalas',
+            'Regras de ponto',
             'Ajustes e justificativas',
-            'Atestados',
-            'Férias',
-            'Afastamentos',
+            'Calendários e feriados',
+            'Dados da conta responsável',
           ].map((t) => (
             <div key={t}>
               <ShieldCheck size={20} />
               <b>{t}</b>
-              <Badge tone="gray">Fase 2</Badge>
+              <Badge tone="green">Sincronização ativa</Badge>
             </div>
           ))}
         </div>
