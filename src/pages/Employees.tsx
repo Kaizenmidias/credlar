@@ -92,7 +92,7 @@ export default function Employees({ contractFilter }: { contractFilter?: 'CLT' |
       (!status || e.status === status) &&
       (!selectedContractType || (e.contractType || 'CLT') === selectedContractType) &&
       (!dept || e.departmentId === dept),
-  );
+  ).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   const edit = (e?: Employee) => {
     setEditing(e ? { ...e } : { ...blank, departmentId: data.departments[0]?.id || '' });
     setTab(0);

@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Users,
   Building2,
+  BriefcaseBusiness,
   PlugZap,
   ScanLine,
   ClipboardList,
@@ -35,6 +36,7 @@ import { Button, Modal, Field, Notice } from './components/ui';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
 import Departments from './pages/Departments';
+import JobRoles from './pages/JobRoles';
 import Units from './pages/Units';
 import Integration from './pages/Integration';
 import Audit from './pages/Audit';
@@ -47,7 +49,9 @@ import DesignSystem from './pages/DesignSystem';
 const nav = [
   ['/', 'Dashboard', LayoutDashboard],
   ['/funcionarios', 'Funcionários', Users],
+  ['/pessoa-juridica', 'Pessoa Jurídica', BriefcaseBusiness],
   ['/departamentos', 'Departamentos', Building2],
+  ['/cargos', 'Cargos', BriefcaseBusiness],
   ['/unidades', 'Unidades', Building2],
   ['/integracao', 'Integração Sólides', PlugZap],
   ['/auditoria', 'Auditoria de ponto', ScanLine],
@@ -60,7 +64,7 @@ const nav = [
   ['/configuracoes', 'Configurações', Settings],
 ] as const;
 const navGroups = [
-  { id: 'jornada', label: 'JORNADA & PONTO', items: nav.slice(4, 7) },
+  { id: 'jornada', label: 'JORNADA & PONTO', items: nav.slice(5, 8) },
   { id: 'beneficios', label: 'BENEFÍCIOS & FECHAMENTO', items: nav.slice(7, 11) },
   { id: 'admin', label: 'ADMINISTRAÇÃO', items: nav.slice(11) },
 ] as const;
@@ -478,6 +482,7 @@ export default function App() {
               <Route path="/funcionarios" element={<Employees contractFilter="CLT" />} />
               <Route path="/pessoa-juridica" element={<Employees contractFilter="PJ" />} />
               <Route path="/departamentos" element={<Departments />} />
+              <Route path="/cargos" element={<JobRoles />} />
               <Route path="/unidades" element={<Units />} />
               <Route path="/integracao" element={<Integration />} />
               <Route path="/auditoria" element={<Audit />} />
