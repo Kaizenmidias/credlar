@@ -42,6 +42,19 @@ const blank: Omit<Employee, 'id' | 'version'> = {
   extraDays: [],
   excludedDays: [],
 };
+const solidesDate = (value: unknown) => {
+  if (!value) return '';
+  const date = typeof value === 'number' || /^\d{10,13}$/.test(String(value))
+    ? new Date(Number(value))
+    : new Date(String(value));
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+};
+const solidesSchedule = (row: any) => {
+  const schedule = row.currentWorkSchedule || row.workSchedule || row.schedule;
+  if (!schedule) return 'Não informada';
+  if (typeof schedule === 'string' || typeof schedule === 'number') return String(schedule);
+  return schedule.name || schedule.description || (schedule.id ? `Código ${schedule.id}` : 'Vinculada');
+};
 export default function Employees() {
   const { data, filters, canEdit, reload, notify } = useDho();
   const [params] = useSearchParams();
@@ -107,8 +120,10 @@ export default function Employees() {
         const name = row.name || row.fullName || row.nome || row.employeeName;
         const registration = String(row.registration || row.registrationNumber || row.matricula || row.id || '').trim();
         if (!name || !registration || data.employees.some((e) => e.registration === registration)) { skipped++; continue; }
-        await api('/employees', 'POST', { ...blank, name, registration, departmentId: row.departmentId || data.departments[0]?.id || '', cpf: row.cpf || '', email: row.email || '', jobTitle: row.jobTitle || row.role || 'Revisar cargo', admissionDate: String(row.admissionDate || blank.admissionDate).slice(0, 10), salary: Number(row.salary || 0) });
-        imported++;
+        try {
+          await api('/employees', 'POST', { ...blank, name, registration, departmentId: row.departmentId || data.departments[0]?.id || '', cpf: row.cpf || '', email: row.email || '', jobTitle: row.jobTitle || row.role || row.jobRoleDTO?.name || 'Revisar cargo', admissionDate: solidesDate(row.admissionDate) || blank.admissionDate, scheduleName: solidesSchedule(row), salary: Number(row.salary || 0) });
+          imported++;
+        } catch { skipped++; }
       }
       await reload(); setSolidesSummary(`${imported} importados · ${skipped} ignorados por duplicidade ou dados incompletos.`); notify('Funcionários importados da Sólides.');
     } catch (e) { setSolidesError((e as Error).message); }
@@ -480,7 +495,7 @@ export default function Employees() {
         {!solidesRows.length && <Notice>O sistema consultará a API usando o token salvo em Integrações.</Notice>}
         {solidesError && <Notice tone="red">{solidesError}</Notice>}
         {solidesSummary && <Notice tone="green">{solidesSummary}</Notice>}
-        {solidesRows.length > 0 && <div className="table-wrap"><table><thead><tr>{Object.keys(solidesRows[0]).slice(0, 7).map((k) => <th key={k}>{({ id: 'ID', name: 'Nome', fullName: 'Nome completo', registration: 'Matrícula', cpf: 'CPF', email: 'E-mail', department: 'Departamento', jobTitle: 'Cargo' } as Record<string, string>)[k] || k}</th>)}</tr></thead><tbody>{solidesRows.slice(0, 8).map((row, i) => <tr key={i}>{Object.values(row).slice(0, 7).map((v: any, j) => <td key={j}>{String(v ?? '')}</td>)}</tr>)}</tbody></table></div>}
+        {solidesRows.length > 0 && <div className="table-wrap"><table><thead><tr><th>Nome</th><th>Matrícula</th><th>CPF</th><th>E-mail</th><th>Nascimento</th><th>Admissão</th><th>Jornada</th></tr></thead><tbody>{solidesRows.slice(0, 10).map((row, i) => <tr key={row.id || i}><td>{row.name || row.fullName || 'Não informado'}</td><td>{row.registration || row.registrationNumber || row.id || '—'}</td><td>{formatCpf(String(row.cpf || '')) || '—'}</td><td>{row.email || '—'}</td><td>{solidesDate(row.birthDate) ? dateBR(solidesDate(row.birthDate)) : '—'}</td><td>{solidesDate(row.admissionDate) ? dateBR(solidesDate(row.admissionDate)) : '—'}</td><td>{solidesSchedule(row)}</td></tr>)}</tbody></table><small style={{ display: 'block', padding: '10px 4px' }}>Exibindo 10 de {solidesRows.length} colaboradores ativos na prévia.</small></div>}
         <div className="modal-footer"><Button variant="secondary" disabled={solidesBusy} onClick={() => setSolidesOpen(false)}>Fechar</Button>{!solidesRows.length ? <Button busy={solidesBusy} onClick={previewSolides}>Buscar na Sólides</Button> : <Button busy={solidesBusy} onClick={importSolides}>Confirmar importação</Button>}</div>
       </Modal>}
       {view && (

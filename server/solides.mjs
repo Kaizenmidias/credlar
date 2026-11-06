@@ -45,11 +45,30 @@ export async function importSolidesEntity({ baseUrl = DEFAULT_BASE_URL, token, e
       || operations.find((item) => item.path === '/employee/find')
     : operations.find((item) => matcher.test(`${item.path} ${item.operationId} ${item.summary} ${item.tags.join(' ')}`));
   if (!operation) return { entity, available: false, message: 'A API autorizada não publicou uma operação GET compatível para este tipo.', operations };
-  const params = entity === 'employees'
-    ? { pageNumber: 0, pageSize: 500, showFired: 0 }
-    : { page: 0, size: 500 };
-  const body = await solidesFetch({ baseUrl, token, path: operation.path, params });
-  const rows = Array.isArray(body) ? body : body?.content || body?.data || body?.items || [];
+  let body;
+  let rows;
+  if (entity === 'employees') {
+    const allRows = [];
+    let page = 0;
+    let totalPages = 1;
+    do {
+      body = await solidesFetch({
+        baseUrl,
+        token,
+        path: operation.path,
+        params: { page, size: 20, showFired: 0 },
+      });
+      const pageRows = Array.isArray(body) ? body : body?.content || body?.data || body?.items || [];
+      allRows.push(...pageRows);
+      totalPages = Number(body?.totalPages || 1);
+      page += 1;
+    } while (page < totalPages && page < 100);
+    rows = [...new Map(allRows.map((row) => [String(row?.id ?? row?.registration ?? JSON.stringify(row)), row])).values()]
+      .filter((row) => row && row.fired !== true && row.inactive !== true);
+  } else {
+    body = await solidesFetch({ baseUrl, token, path: operation.path, params: { page: 0, size: 500 } });
+    rows = Array.isArray(body) ? body : body?.content || body?.data || body?.items || [];
+  }
   if (entity === 'employees' && rows.length && !rows.some((row) => row && (row.name || row.fullName || row.nome || row.employeeName || row.registration || row.registrationNumber || row.matricula))) {
     throw Object.assign(new Error('A operação de funcionários retornou outro tipo de dado. Verifique a permissão do endpoint /employee/find-all na Sólides.'), { status: 422 });
   }
