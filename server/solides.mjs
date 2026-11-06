@@ -54,6 +54,16 @@ async function fetchAllPages({ baseUrl, token, path, params = {} }) {
 export async function syncAllSolidesData({ baseUrl = DEFAULT_BASE_URL, token }) {
   const result = [];
   const employees = await importSolidesEntity({ baseUrl, token, entity: 'employees' });
+  for (let index = 0; index < employees.rows.length; index++) {
+    const row = employees.rows[index];
+    const hasValidWorkplace = Array.isArray(row?.workplaceList) && row.workplaceList.some((item) => Number(item?.id) > 0);
+    if (hasValidWorkplace || !row?.id) continue;
+    try {
+      const detail = await solidesFetch({ baseUrl, token, path: '/employee/find', params: { tangerinoId: row.id, ignoreFired: false } });
+      const detailedRow = Array.isArray(detail) ? detail[0] : detail?.data || detail;
+      if (detailedRow && typeof detailedRow === 'object') employees.rows[index] = { ...row, ...detailedRow };
+    } catch { /* o registro resumido continua preservado quando o detalhe não estiver autorizado */ }
+  }
   result.push({ key: 'employees', label: 'Funcionários', path: employees.operation?.path, status: 'ok', rows: employees.rows });
   for (const [key, label, path] of SOLIDES_DATASETS) {
     try {
