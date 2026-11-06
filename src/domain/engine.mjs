@@ -90,7 +90,9 @@ export function audit(employees, punches, start, end, company, reviews = [], occ
         .sort((a, b) => minutes(a) - minutes(b));
       const justified = occurrences.find((item) => item.employeeId === e.id && item.status !== 'Pendente' && item.startDate <= date && (item.endDate || item.startDate) >= date);
       if (justified) continue;
-      if (!scheduled(e, date, company.holidays) && !times.length) continue;
+      // Feriados não são aplicados automaticamente na auditoria: algumas pessoas
+      // trabalham nesses dias e a decisão deve seguir a escala individual.
+      if (!scheduled(e, date, []) && !times.length) continue;
       const issues = [];
       let severity = 'green';
       const add = (text, level = 'yellow') => {
