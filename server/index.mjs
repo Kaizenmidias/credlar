@@ -722,7 +722,7 @@ export async function createApp(db, { production = false, demo = false } = {}) {
         const contractText = JSON.stringify(source).toLowerCase();
         const contractType = /pessoa jur[ií]dica|prestador|\bpj\b/.test(contractText) ? 'PJ' : 'CLT';
         const workplaceName = String(source.workplaceName || source.workplace?.name || (Array.isArray(source.workplaceList) ? source.workplaceList.map((item) => workplaces.get(String(item?.id))).filter(Boolean).join(' / ') : '')).trim();
-        const departmentName = String(source.departmentName || source.department?.name || source.departmentDTO?.name || source.costCenter?.name || workplaceName || 'A revisar - importação Sólides').trim();
+        const departmentName = String(source.departmentName || source.department?.name || source.departmentDTO?.name || source.costCenter?.name || workplaceName || 'Sem departamento informado pela Sólides').trim();
         let department = (await db.query('SELECT id FROM departments WHERE LOWER(name)=LOWER(?)', [departmentName])).rows[0];
         if (!department) {
           const id = randomUUID();
