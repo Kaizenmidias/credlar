@@ -10,7 +10,7 @@ import { connectDb } from './db.mjs';
 import { seed } from './seed.mjs';
 import { hashPassword, verifyPassword, digest, validCpf } from './security.mjs';
 import { audit, benefit, nightPay, daysBetween } from '../src/domain/engine.mjs';
-import { testSolidesConnection, importSolidesEntity, syncAllSolidesData } from './solides.mjs';
+import { testSolidesConnection, importSolidesEntity, syncAllSolidesData, fetchSolidesPunches, fetchSolidesWorkSchedule } from './solides.mjs';
 import { decryptSecret, encryptSecret } from './secrets.mjs';
 
 const userSchema = z.object({
@@ -707,6 +707,64 @@ export async function createApp(db, { production = false, demo = false } = {}) {
     } catch (error) {
       res.status(error.status && Number(error.status) >= 400 ? Number(error.status) : 502).json({ message: error.message || 'Não foi possível consultar a Sólides.' });
     }
+  });
+  app.post('/api/integration/solides/sync-punches', admin, async (req, res) => {
+    const input = z.object({ startDate: date.default('2025-08-21'), endDate: date.default(new Date().toISOString().slice(0, 10)) }).parse(req.body || {});
+    const saved = (await db.query('SELECT * FROM integration_credentials WHERE provider=?', ['solides'])).rows[0];
+    if (!saved) return res.status(422).json({ message: 'Salve o token da Sólides antes de sincronizar.' });
+    const token = decryptSecret(saved);
+    const employees = (await db.query('SELECT id,data FROM employees')).rows.map((row) => ({ id: row.id, ...JSON.parse(row.data || '{}') }));
+    const toDate = (stamp) => {
+      if (!stamp) return '';
+      const d = new Date(Number(stamp));
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(d);
+    };
+    const toTime = (stamp) => {
+      if (stamp == null || stamp === '') return '';
+      return new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(Number(stamp)));
+    };
+    const msToTime = (value) => {
+      if (value == null || Number.isNaN(Number(value))) return '';
+      const minutes = Math.floor(Number(value) / 60000);
+      return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+    };
+    const scheduleDays = (list = []) => [...new Set(list.map((item) => {
+      const day = Number(item.day);
+      return day === 1 ? 0 : Math.max(0, Math.min(6, day - 1));
+    }))].sort((a, b) => a - b);
+    let imported = 0; let updated = 0; let skipped = 0; let errors = 0; const errorDetails = [];
+    const scheduleCache = new Map();
+    for (const employee of employees) {
+      const source = employee.solidesData || {};
+      const sourceId = source.id || source.employeeId || source.tangerinoId;
+      if (!sourceId) { skipped++; continue; }
+      try {
+        const punches = await fetchSolidesPunches({ baseUrl: saved.base_url, token, employeeId: sourceId, startDate: input.startDate, endDate: input.endDate });
+        for (const raw of punches) {
+          const punchDate = toDate(raw.dateWorked || raw.date || raw.workDate || raw.startDateTimestamp);
+          if (!punchDate) { skipped++; continue; }
+          const times = [toTime(raw.startDateTimestamp || raw.startTimestamp || raw.start), toTime(raw.endDateTimestamp || raw.endTimestamp || raw.end)].filter(Boolean);
+          const externalKey = digest(`solides-punch|${employee.id}|${punchDate}|${JSON.stringify(times)}|${raw.id || ''}`);
+          const payload = { employeeId: employee.id, date: punchDate, times, status: raw.status || 'Importado', source: 'Sólides', solidesData: raw };
+          const current = (await db.query('SELECT id FROM records WHERE external_key=?', [externalKey])).rows[0];
+          if (current) { await db.query('UPDATE records SET data=?,version=version+1 WHERE id=?', [JSON.stringify({ ...payload, id: current.id }), current.id]); updated++; }
+          else { await db.query('INSERT INTO records(id,kind,external_key,data) VALUES (?,?,?,?)', [randomUUID(), 'punches', externalKey, JSON.stringify(payload)]); imported++; }
+        }
+        const schedule = source.currentWorkSchedule || source.workSchedule || source.schedule;
+        const scheduleId = typeof schedule === 'object' ? schedule?.id : schedule;
+        if (scheduleId && !scheduleCache.has(String(scheduleId))) scheduleCache.set(String(scheduleId), await fetchSolidesWorkSchedule({ baseUrl: saved.base_url, token, scheduleId }));
+        const scheduleBody = scheduleId ? scheduleCache.get(String(scheduleId)) : null;
+        if (scheduleBody) {
+          const timetable = Array.isArray(scheduleBody.workScheduleTimetableList) ? scheduleBody.workScheduleTimetableList : [];
+          const first = timetable.find((item) => item.startShift1 != null) || timetable[0] || {};
+          const scheduleDetails = { id: scheduleBody.id, name: scheduleBody.name || `Código ${scheduleBody.id}`, days: scheduleDays(timetable), timetable, raw: scheduleBody };
+          const nextData = { ...employee.solidesData, scheduleDetails };
+          const next = { ...employee, scheduleName: scheduleDetails.name, weekdays: scheduleDetails.days, startTime: msToTime(first.startShift1) || employee.startTime || '08:00', breakStart: msToTime(first.startMainInterval) || employee.breakStart || '12:00', breakEnd: msToTime(first.endMainInterval) || employee.breakEnd || '13:00', endTime: msToTime(first.endShift2 || first.endShift1) || employee.endTime || '17:00', expectedPunches: first.startShift2 != null ? 4 : 2, solidesData: nextData };
+          await db.query('UPDATE employees SET data=?,version=version+1 WHERE id=?', [JSON.stringify(next), employee.id]);
+        }
+      } catch (error) { errors++; if (errorDetails.length < 10) errorDetails.push({ employee: employee.name, message: error.message }); }
+    }
+    res.json({ ok: errors === 0, startDate: input.startDate, endDate: input.endDate, employees: employees.length, imported, updated, skipped, errors, errorDetails, schedules: scheduleCache.size });
   });
   app.post('/api/integration/solides/sync-all', admin, async (req, res) => {
     const saved = (await db.query('SELECT * FROM integration_credentials WHERE provider=?', ['solides'])).rows[0];

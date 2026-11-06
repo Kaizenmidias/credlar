@@ -42,6 +42,10 @@ export default function Integration() {
     [apiImporting, setApiImporting] = useState(false),
     [syncingAll, setSyncingAll] = useState(false),
     [syncResult, setSyncResult] = useState<any>(null),
+    [punchStart, setPunchStart] = useState('2025-08-21'),
+    [punchEnd, setPunchEnd] = useState(new Date().toISOString().slice(0, 10)),
+    [syncingPunches, setSyncingPunches] = useState(false),
+    [punchResult, setPunchResult] = useState<any>(null),
     [dataView, setDataView] = useState<any>(null),
     [dataViewBusy, setDataViewBusy] = useState(false);
   const previewApi = async () => {
@@ -312,6 +316,20 @@ export default function Integration() {
               finally { setSyncingAll(false); }
             }}><RefreshCw size={16}/> Sincronizar todos os dados disponíveis</Button>
           </div>
+          <div className="button-row" style={{ marginTop: 16, alignItems: 'end' }}>
+            <Field label="Início das marcações"><input type="date" value={punchStart} max={punchEnd} onChange={(e) => setPunchStart(e.target.value)} /></Field>
+            <Field label="Fim das marcações"><input type="date" value={punchEnd} min={punchStart} onChange={(e) => setPunchEnd(e.target.value)} /></Field>
+            <Button disabled={!isAdmin || !punchStart || !punchEnd} busy={syncingPunches} onClick={async () => {
+              setSyncingPunches(true); setPunchResult(null); setError('');
+              try {
+                const result = await api('/integration/solides/sync-punches', 'POST', { startDate: punchStart, endDate: punchEnd });
+                setPunchResult(result); await reload();
+                notify(`Marcações importadas: ${result.imported} novas e ${result.updated} atualizadas.`, result.errors ? 'orange' : 'green');
+              } catch (e) { setError((e as Error).message); notify((e as Error).message, 'red'); }
+              finally { setSyncingPunches(false); }
+            }}><RefreshCw size={16}/> Importar marcações e escalas</Button>
+          </div>
+          {punchResult && <Notice tone={punchResult.errors ? 'orange' : 'green'}>{punchResult.imported} marcações novas · {punchResult.updated} atualizadas · {punchResult.schedules} escalas carregadas · período {punchResult.startDate} a {punchResult.endDate}.</Notice>}
           {syncResult && <div style={{ marginTop: 16 }}><Notice tone="green">{syncResult.stored} registros preservados integralmente · {syncResult.employeesCreated} funcionários criados · {syncResult.employeesUpdated} atualizados.</Notice><div className="capability-grid" style={{ marginTop: 12 }}>{syncResult.datasets.map((item: any) => <div key={item.key}><ShieldCheck size={18}/><b>{item.label}</b><Badge tone={item.status === 'ok' ? 'green' : 'orange'}>{item.status === 'ok' ? `${item.count} registros` : `Sem permissão${item.statusCode ? ` · HTTP ${item.statusCode}` : ''}`}</Badge></div>)}</div></div>}
           <div className="button-row" style={{ marginTop: 16 }}>
             <select value={apiEntity} onChange={(e) => setApiEntity(e.target.value)} disabled={!isAdmin || apiBusy}>

@@ -144,6 +144,32 @@ export async function importSolidesEntity({ baseUrl = DEFAULT_BASE_URL, token, e
   return { entity, available: true, operation, count: rows.length, rows };
 }
 
+const brDate = (value) => {
+  const [year, month, day] = String(value || '').split('-');
+  return year && month && day ? `${day}/${month}/${year}` : value;
+};
+
+export async function fetchSolidesPunches({ baseUrl = DEFAULT_BASE_URL, token, employeeId, startDate, endDate }) {
+  const rows = [];
+  let pageNumber = 0;
+  let totalPages = 1;
+  do {
+    const body = await solidesFetch({
+      baseUrl, token,
+      path: `/external/api/v1/payssego/punches/${encodeURIComponent(employeeId)}`,
+      params: { startDate: brDate(startDate), endDate: brDate(endDate), pageNumber, pageSize: 100, showFired: false },
+    });
+    rows.push(...(Array.isArray(body) ? body : body?.content || body?.data || body?.items || []));
+    totalPages = Number(body?.totalPages || 1);
+    pageNumber += 1;
+  } while (pageNumber < totalPages && pageNumber < 200);
+  return rows;
+}
+
+export async function fetchSolidesWorkSchedule({ baseUrl = DEFAULT_BASE_URL, token, scheduleId }) {
+  return solidesFetch({ baseUrl, token, path: `/work-schedule/${encodeURIComponent(scheduleId)}` });
+}
+
 export async function testSolidesConnection({ baseUrl = process.env.SOLIDES_API_BASE_URL || DEFAULT_BASE_URL, token = process.env.SOLIDES_API_TOKEN } = {}) {
   if (!token) return { configured: false, message: 'Token Sólides ainda não configurado no servidor.' };
   const normalizedToken = token.replace(/^Basic\s+/i, '').trim();
