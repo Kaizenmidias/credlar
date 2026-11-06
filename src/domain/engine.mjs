@@ -92,7 +92,7 @@ export function audit(employees, punches, start, end, company, reviews = [], occ
       if (justified) continue;
       // Feriados não são aplicados automaticamente na auditoria: algumas pessoas
       // trabalham nesses dias e a decisão deve seguir a escala individual.
-      if (!scheduled(e, date, []) && !times.length) continue;
+      if (!scheduled(e, date, company.holidays) && !times.length) continue;
       const issues = [];
       let severity = 'green';
       const add = (text, level = 'yellow') => {
