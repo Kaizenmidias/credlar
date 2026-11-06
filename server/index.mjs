@@ -47,6 +47,7 @@ const empSchema = z.object({
     .refine((v) => !v || validCpf(v), 'CPF inválido'),
   gender: z.enum(['Feminino', 'Masculino', 'Outro', 'Não informado']),
   departmentId: z.string().min(1),
+  unitId: z.string().default(''),
   jobTitle: z.string().min(2),
   contractType: z.enum(['CLT', 'PJ']).default('CLT'),
   email: z.union([z.string().email(), z.literal('')]).default(''),
@@ -402,9 +403,38 @@ export async function createApp(db, { production = false, demo = false } = {}) {
       write,
       ...(['departments', 'units'].includes(name) ? [admin] : []),
       async (req, res) => {
-        const d = schema.parse(req.body),
-          id = randomUUID();
-        if (name === 'employees')
+        let d = schema.parse(req.body);
+        const id = randomUUID();
+        if (name === 'employees') {
+          const source = d.solidesData || {};
+          const sourceDepartmentName = String(source.departmentName || source.department?.name || source.departmentDTO?.name || '').trim();
+          const sourceUnitName = String(source.unitName || source.unit?.name || source.workplaceName || source.workplace?.name || '').trim();
+          let departmentId = d.departmentId;
+          if (!(await db.query('SELECT id FROM departments WHERE id=?', [departmentId])).rows.length) {
+            const byName = sourceDepartmentName ? (await db.query('SELECT id FROM departments WHERE LOWER(name)=LOWER(?)', [sourceDepartmentName])).rows[0] : null;
+            if (byName) departmentId = byName.id;
+            else {
+              const fallbackName = sourceDepartmentName || 'A revisar - importação Sólides';
+              const existingFallback = (await db.query('SELECT id FROM departments WHERE LOWER(name)=LOWER(?)', [fallbackName])).rows[0];
+              if (existingFallback) departmentId = existingFallback.id;
+              else {
+                departmentId = randomUUID();
+                const department = { name: fallbackName, manager: '', description: sourceDepartmentName ? 'Importado automaticamente da Sólides.' : 'Departamento temporário para registros sem departamento informado.', color: '#3764eb', weekdays: [1, 2, 3, 4, 5], vaDeductions: ['Falta injustificada', 'Suspensão'], vtDeductions: ['Falta injustificada', 'Atestado', 'Férias'], sundayPolicy: 'Revisão por escala e convenção coletiva', womenSundayRest: 2, contractType: d.contractType === 'PJ' ? 'PJ' : 'CLT' };
+                await db.query('INSERT INTO departments(id,name,data) VALUES (?,?,?)', [departmentId, department.name, JSON.stringify(department)]);
+              }
+            }
+          }
+          let unitId = d.unitId || '';
+          if (sourceUnitName) {
+            const existingUnit = (await db.query('SELECT id FROM units WHERE LOWER(name)=LOWER(?)', [sourceUnitName])).rows[0];
+            if (existingUnit) unitId = existingUnit.id;
+            else {
+              unitId = randomUUID();
+              const unit = { name: sourceUnitName, description: 'Importada automaticamente da Sólides.', contractType: d.contractType === 'PJ' ? 'PJ' : 'CLT', source: 'Sólides' };
+              await db.query('INSERT INTO units(id,name,data) VALUES (?,?,?)', [unitId, unit.name, JSON.stringify(unit)]);
+            }
+          }
+          d = { ...d, departmentId, unitId };
           await db.query(
             'INSERT INTO employees(id,registration,cpf,department_id,data) VALUES (?,?,?,?,?)',
             [
@@ -415,7 +445,7 @@ export async function createApp(db, { production = false, demo = false } = {}) {
               JSON.stringify(d),
             ],
           );
-        else if (name === 'departments')
+        } else if (name === 'departments')
           await db.query('INSERT INTO departments(id,name,data) VALUES (?,?,?)', [
             id,
             d.name,

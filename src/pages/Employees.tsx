@@ -21,6 +21,7 @@ const blank: Omit<Employee, 'id' | 'version'> = {
   cpf: '',
   gender: 'Não informado',
   departmentId: '',
+  unitId: '',
   jobTitle: '',
   contractType: 'CLT',
   email: '',

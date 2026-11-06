@@ -30,6 +30,7 @@ export interface Employee {
   cpf: string;
   gender: string;
   departmentId: string;
+  unitId?: string;
   jobTitle: string;
   contractType: 'CLT' | 'PJ';
   email: string;
