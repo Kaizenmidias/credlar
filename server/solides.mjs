@@ -57,7 +57,8 @@ export async function syncAllSolidesData({ baseUrl = DEFAULT_BASE_URL, token }) 
   for (let index = 0; index < employees.rows.length; index++) {
     const row = employees.rows[index];
     const hasValidWorkplace = Array.isArray(row?.workplaceList) && row.workplaceList.some((item) => Number(item?.id) > 0);
-    if (hasValidWorkplace || !row?.id) continue;
+    const hasContractType = Object.keys(row || {}).some((key) => /contract|employment|v[ií]nculo|tipo/i.test(key));
+    if ((hasValidWorkplace && hasContractType) || !row?.id) continue;
     try {
       const detail = await solidesFetch({ baseUrl, token, path: '/employee/find', params: { tangerinoId: row.id, ignoreFired: false } });
       const detailedRow = Array.isArray(detail) ? detail[0] : detail?.data || detail;
