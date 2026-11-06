@@ -49,7 +49,7 @@ export async function importSolidesEntity({ baseUrl = DEFAULT_BASE_URL, token, e
   let rows;
   if (entity === 'employees') {
     const allRows = [];
-    let page = 0;
+    let page = 1;
     let totalPages = 1;
     do {
       body = await solidesFetch({
@@ -62,9 +62,9 @@ export async function importSolidesEntity({ baseUrl = DEFAULT_BASE_URL, token, e
       allRows.push(...pageRows);
       totalPages = Number(body?.totalPages || 1);
       page += 1;
-    } while (page < totalPages && page < 100);
+    } while (page <= totalPages && page <= 100);
     rows = [...new Map(allRows.map((row) => [String(row?.id ?? row?.registration ?? JSON.stringify(row)), row])).values()]
-      .filter((row) => row && row.fired !== true && row.inactive !== true);
+      .filter((row) => row && row.fired !== true);
   } else {
     body = await solidesFetch({ baseUrl, token, path: operation.path, params: { page: 0, size: 500 } });
     rows = Array.isArray(body) ? body : body?.content || body?.data || body?.items || [];
