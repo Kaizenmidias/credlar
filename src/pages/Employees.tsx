@@ -22,6 +22,7 @@ const blank: Omit<Employee, 'id' | 'version'> = {
   gender: 'Não informado',
   departmentId: '',
   jobTitle: '',
+  contractType: 'CLT',
   email: '',
   admissionDate: new Date().toISOString().slice(0, 10),
   terminationDate: '',
@@ -60,6 +61,7 @@ export default function Employees() {
   const [params] = useSearchParams();
   const [search, setSearch] = useState(params.get('busca') || ''),
     [status, setStatus] = useState(''),
+    [contractType, setContractType] = useState(''),
     [dept, setDept] = useState(filters.department),
     [page, setPage] = useState(1),
     [editing, setEditing] = useState<any>(null),
@@ -72,10 +74,12 @@ export default function Employees() {
     [solidesBusy, setSolidesBusy] = useState(false),
     [solidesError, setSolidesError] = useState(''),
     [solidesSummary, setSolidesSummary] = useState('');
+  const [solidesPage, setSolidesPage] = useState(1);
   const rows = data.employees.filter(
     (e) =>
       (e.name + e.registration + e.cpf).toLowerCase().includes(search.toLowerCase()) &&
       (!status || e.status === status) &&
+      (!contractType || (e.contractType || 'CLT') === contractType) &&
       (!dept || e.departmentId === dept),
   );
   const edit = (e?: Employee) => {
@@ -108,7 +112,7 @@ export default function Employees() {
     try {
       const result = await api('/integration/solides/preview', 'POST', { entity: 'employees' });
       if (!result.available) throw Error(result.message);
-      setSolidesRows(result.rows || []);
+      setSolidesRows(result.rows || []); setSolidesPage(1);
       setSolidesSummary(`${result.count} funcionários encontrados. Confira a prévia e confirme para cadastrar.`);
     } catch (e) { setSolidesError((e as Error).message); }
     finally { setSolidesBusy(false); }
@@ -121,7 +125,8 @@ export default function Employees() {
         const registration = String(row.registration || row.registrationNumber || row.matricula || row.id || '').trim();
         if (!name || !registration || data.employees.some((e) => e.registration === registration)) { skipped++; continue; }
         try {
-          await api('/employees', 'POST', { ...blank, name, registration, departmentId: row.departmentId || data.departments[0]?.id || '', cpf: row.cpf || '', email: row.email || '', jobTitle: row.jobTitle || row.role || row.jobRoleDTO?.name || 'Revisar cargo', admissionDate: solidesDate(row.admissionDate) || blank.admissionDate, scheduleName: solidesSchedule(row), salary: Number(row.salary || 0) });
+          const importedContractType = /pj|prestador|jur[ií]dica/i.test(String(row.contractType || row.contractTypeName || row.type || '')) ? 'PJ' : 'CLT';
+          await api('/employees', 'POST', { ...blank, name, registration, contractType: importedContractType, departmentId: row.departmentId || data.departments[0]?.id || '', cpf: row.cpf || '', email: row.email || '', jobTitle: row.jobTitle || row.role || row.jobRoleDTO?.name || 'Revisar cargo', admissionDate: solidesDate(row.admissionDate) || blank.admissionDate, scheduleName: solidesSchedule(row), salary: Number(row.salary || 0) });
           imported++;
         } catch { skipped++; }
       }
@@ -202,6 +207,11 @@ export default function Employees() {
                 <option key={s}>{s}</option>
               ))}
             </select>
+            <select aria-label="Filtrar regime" value={contractType} onChange={(e) => { setContractType(e.target.value); setPage(1); }}>
+              <option value="">CLT e PJ</option>
+              <option value="CLT">Somente CLT</option>
+              <option value="PJ">Somente PJ</option>
+            </select>
           </div>
         </div>
         <div className="table-wrap">
@@ -211,6 +221,7 @@ export default function Employees() {
                 <th>Funcionário</th>
                 <th>Departamento</th>
                 <th>Cargo</th>
+                <th>Regime</th>
                 <th>Admissão</th>
                 <th>Jornada</th>
                 <th>Situação</th>
@@ -241,6 +252,7 @@ export default function Employees() {
                     {data.departments.find((d) => d.id === e.departmentId)?.name}
                   </td>
                   <td>{e.jobTitle}</td>
+                  <td><Badge tone={(e.contractType || 'CLT') === 'PJ' ? 'orange' : 'blue'}>{e.contractType || 'CLT'}</Badge></td>
                   <td>{dateBR(e.admissionDate)}</td>
                   <td>{e.weeklyHours}h / semana</td>
                   <td>
@@ -265,7 +277,7 @@ export default function Employees() {
               ))}
               {!rows.length && (
                 <tr>
-                  <td colSpan={7} className="empty-cell">
+                    <td colSpan={8} className="empty-cell">
                     Nenhum funcionário encontrado para estes filtros.
                   </td>
                 </tr>
@@ -346,6 +358,12 @@ export default function Employees() {
               </Field>
               <Field label="Cargo *">
                 <input value={editing.jobTitle} onChange={(e) => set('jobTitle', e.target.value)} />
+              </Field>
+              <Field label="Regime de contratação *">
+                <select value={editing.contractType || 'CLT'} onChange={(e) => set('contractType', e.target.value)}>
+                  <option value="CLT">CLT</option>
+                  <option value="PJ">PJ — Prestador de serviço</option>
+                </select>
               </Field>
               <Field label="Admissão *">
                 <input
@@ -495,7 +513,7 @@ export default function Employees() {
         {!solidesRows.length && <Notice>O sistema consultará a API usando o token salvo em Integrações.</Notice>}
         {solidesError && <Notice tone="red">{solidesError}</Notice>}
         {solidesSummary && <Notice tone="green">{solidesSummary}</Notice>}
-        {solidesRows.length > 0 && <div className="table-wrap"><table><thead><tr><th>Nome</th><th>Matrícula</th><th>CPF</th><th>E-mail</th><th>Nascimento</th><th>Admissão</th><th>Jornada</th></tr></thead><tbody>{solidesRows.slice(0, 10).map((row, i) => <tr key={row.id || i}><td>{row.name || row.fullName || 'Não informado'}</td><td>{row.registration || row.registrationNumber || row.id || '—'}</td><td>{formatCpf(String(row.cpf || '')) || '—'}</td><td>{row.email || '—'}</td><td>{solidesDate(row.birthDate) ? dateBR(solidesDate(row.birthDate)) : '—'}</td><td>{solidesDate(row.admissionDate) ? dateBR(solidesDate(row.admissionDate)) : '—'}</td><td>{solidesSchedule(row)}</td></tr>)}</tbody></table><small style={{ display: 'block', padding: '10px 4px' }}>Exibindo 10 de {solidesRows.length} colaboradores ativos na prévia.</small></div>}
+        {solidesRows.length > 0 && <><div className="table-wrap"><table><thead><tr><th>Nome</th><th>Matrícula</th><th>CPF</th><th>E-mail</th><th>Nascimento</th><th>Admissão</th><th>Jornada</th></tr></thead><tbody>{solidesRows.slice((solidesPage - 1) * 10, solidesPage * 10).map((row, i) => <tr key={row.id || i}><td>{row.name || row.fullName || 'Não informado'}</td><td>{row.registration || row.registrationNumber || row.id || '—'}</td><td>{formatCpf(String(row.cpf || '')) || '—'}</td><td>{row.email || '—'}</td><td>{solidesDate(row.birthDate) ? dateBR(solidesDate(row.birthDate)) : '—'}</td><td>{solidesDate(row.admissionDate) ? dateBR(solidesDate(row.admissionDate)) : '—'}</td><td>{solidesSchedule(row)}</td></tr>)}</tbody></table></div><Pagination page={solidesPage} total={solidesRows.length} size={10} onChange={setSolidesPage} /></>}
         <div className="modal-footer"><Button variant="secondary" disabled={solidesBusy} onClick={() => setSolidesOpen(false)}>Fechar</Button>{!solidesRows.length ? <Button busy={solidesBusy} onClick={previewSolides}>Buscar na Sólides</Button> : <Button busy={solidesBusy} onClick={importSolides}>Confirmar importação</Button>}</div>
       </Modal>}
       {view && (

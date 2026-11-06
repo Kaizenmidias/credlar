@@ -29,6 +29,7 @@ export interface Employee {
   gender: string;
   departmentId: string;
   jobTitle: string;
+  contractType: 'CLT' | 'PJ';
   email: string;
   admissionDate: string;
   terminationDate: string;

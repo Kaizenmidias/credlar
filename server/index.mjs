@@ -46,6 +46,7 @@ const empSchema = z.object({
   gender: z.enum(['Feminino', 'Masculino', 'Outro', 'Não informado']),
   departmentId: z.string().min(1),
   jobTitle: z.string().min(2),
+  contractType: z.enum(['CLT', 'PJ']).default('CLT'),
   email: z.union([z.string().email(), z.literal('')]).default(''),
   admissionDate: date,
   terminationDate: z.union([date, z.literal('')]).default(''),
