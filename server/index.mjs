@@ -36,6 +36,7 @@ const deptSchema = z.object({
   contractType: z.enum(['CLT', 'PJ', 'AMBOS', 'NAO_IDENTIFICADO']).default('NAO_IDENTIFICADO'),
 });
 const unitSchema = z.object({ name: z.string().min(2).max(120), description: z.string().max(1000).default(''), contractType: z.enum(['CLT', 'PJ', 'AMBOS', 'NAO_IDENTIFICADO']).default('NAO_IDENTIFICADO'), source: z.string().max(80).default('Manual') });
+const jobRoleSchema = z.object({ name: z.string().min(2).max(160), sourceId: z.string().max(120).default(''), cbo: z.string().max(120).default(''), data: z.record(z.string(), z.unknown()).default({}) });
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const empSchema = z.object({
@@ -70,6 +71,7 @@ const empSchema = z.object({
   extraDays: z.array(date).default([]),
   excludedDays: z.array(date).default([]),
   solidesData: z.record(z.string(), z.unknown()).default({}),
+  jobRoleId: z.string().default(''),
 });
 const ruleSchema = z.object({
   benefitType: z.enum(['va', 'vt', 'night']),
@@ -219,6 +221,7 @@ export async function createApp(db, { production = false, demo = false } = {}) {
       employees: await list('employees'),
       departments: await list('departments'),
       units: await list('units'),
+      jobRoles: (await db.query('SELECT * FROM job_roles ORDER BY name')).rows.map((r) => ({ ...JSON.parse(r.data), id: r.id, name: r.name, sourceId: r.source_id || '', cbo: r.cbo || '', version: r.version })),
       records: (await db.query("SELECT * FROM records WHERE kind NOT LIKE 'solides_%'")).rows.map((r) => ({
         ...JSON.parse(r.data),
         id: r.id,
@@ -392,6 +395,28 @@ export async function createApp(db, { production = false, demo = false } = {}) {
     await db.query('UPDATE closings SET status=?,version=version+1,updated_at=? WHERE id=? AND status=?', ['finalized', new Date().toISOString(), closing.id, 'draft']);
     await log(req, 'finalize', 'closings', closing.id);
     res.json({ ok: true });
+  });
+  app.get('/api/job-roles', async (_, res) => {
+    const rows = (await db.query('SELECT * FROM job_roles ORDER BY name')).rows.map((row) => ({ ...JSON.parse(row.data), id: row.id, name: row.name, sourceId: row.source_id || '', cbo: row.cbo || '', version: row.version }));
+    res.json(rows);
+  });
+  app.post('/api/job-roles', admin, async (req, res) => {
+    const d = jobRoleSchema.parse(req.body); const id = randomUUID();
+    await db.query('INSERT INTO job_roles(id,name,source_id,cbo,data) VALUES (?,?,?,?,?)', [id, d.name, d.sourceId || null, d.cbo, JSON.stringify(d.data)]);
+    await log(req, 'create', 'job_roles', id); res.status(201).json({ ...d, id, version: 1 });
+  });
+  app.put('/api/job-roles/:id', admin, async (req, res) => {
+    const d = jobRoleSchema.parse(req.body); const version = z.number().int().min(1).parse(req.body.version);
+    const result = await db.query('UPDATE job_roles SET name=?,source_id=?,cbo=?,data=?,version=version+1 WHERE id=? AND version=?', [d.name, d.sourceId || null, d.cbo, JSON.stringify(d.data), req.params.id, version]);
+    if (!result.rowCount) return res.status(409).json({ message: 'O cargo foi alterado por outro usuário. Atualize e tente novamente.' });
+    await log(req, 'update', 'job_roles', req.params.id); res.json({ ...d, id: req.params.id, version: version + 1 });
+  });
+  app.delete('/api/job-roles/:id', admin, async (req, res) => {
+    const employees = (await db.query('SELECT data FROM employees')).rows.map((row) => JSON.parse(row.data));
+    if (employees.some((employee) => employee.jobRoleId === req.params.id)) return res.status(409).json({ message: 'Este cargo está vinculado a funcionários e não pode ser removido.' });
+    const result = await db.query('DELETE FROM job_roles WHERE id=?', [req.params.id]);
+    if (!result.rowCount) return res.status(404).json({ message: 'Cargo não encontrado.' });
+    await log(req, 'delete', 'job_roles', req.params.id); res.json({ deleted: true });
   });
   for (const [name, schema] of [
     ['employees', empSchema],
@@ -712,6 +737,14 @@ export async function createApp(db, { production = false, demo = false } = {}) {
       const employeeRows = datasets.find((item) => item.key === 'employees')?.rows || [];
       const jobRoles = new Map((datasets.find((item) => item.key === 'jobRoles')?.rows || []).map((row) => [String(row.id), row.description || row.name || row.title || '']));
       const workplaces = new Map((datasets.find((item) => item.key === 'workplaces')?.rows || []).map((row) => [String(row.id), row.name || row.description || '']));
+      for (const role of datasets.find((item) => item.key === 'jobRoles')?.rows || []) {
+        const sourceId = String(role.id || ''); const name = String(role.description || role.name || role.title || '').trim();
+        if (!name) continue;
+        const existing = (await db.query('SELECT id FROM job_roles WHERE source_id=? OR LOWER(name)=LOWER(?)', [sourceId, name])).rows[0];
+        const value = { sourceId, cbo: String(role.cbo || role.cboId || ''), data: role };
+        if (existing) await db.query('UPDATE job_roles SET name=?,source_id=?,cbo=?,data=?,version=version+1 WHERE id=?', [name, sourceId || null, value.cbo, JSON.stringify(value.data), existing.id]);
+        else await db.query('INSERT INTO job_roles(id,name,source_id,cbo,data) VALUES (?,?,?,?,?)', [randomUUID(), name, sourceId || null, value.cbo, JSON.stringify(value.data)]);
+      }
       let employeesCreated = 0;
       let employeesUpdated = 0;
       let employeesSkipped = 0;
@@ -746,8 +779,9 @@ export async function createApp(db, { production = false, demo = false } = {}) {
         const schedule = source.solidesScheduleName || source.currentWorkSchedule?.name || source.workSchedule?.name || source.schedule?.name || 'Revisar escala importada';
         const roleName = jobRoles.get(String(source.jobRoleDTO?.id || source.jobRole?.id || source.jobRoleId || '')) || '';
         const enrichedSource = { ...source, solidesJobRoleName: roleName, solidesWorkplaceName: workplaceName };
+        const jobRoleId = (await db.query('SELECT id FROM job_roles WHERE source_id=?', [String(source.jobRoleDTO?.id || source.jobRole?.id || source.jobRoleId || '')])).rows[0]?.id || '';
         const draft = empSchema.parse({
-          name, registration, cpf: validCpf(cpfRaw) ? cpfRaw : '', gender, departmentId: department.id, unitId,
+          name, registration, cpf: validCpf(cpfRaw) ? cpfRaw : '', gender, departmentId: department.id, unitId, jobRoleId,
           jobTitle: String(source.jobTitle || source.role || source.jobRole?.name || source.jobRoleDTO?.name || source.employeeFunction?.name || roleName || 'Revisar cargo'),
           contractType, email: String(source.email || '').includes('@') ? String(source.email) : '', admissionDate: isoDate(source.admissionDate || source.hiringDate) || syncedAt.slice(0,10),
           terminationDate: isoDate(source.terminationDate || source.dismissalDate), salary: Number(source.salary || source.baseSalary || 0), weeklyHours: Number(source.weeklyHours || 44),

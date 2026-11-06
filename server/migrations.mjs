@@ -52,6 +52,12 @@ export const migrations = [
       await query(`CREATE TABLE IF NOT EXISTS units (id VARCHAR(191) PRIMARY KEY, name VARCHAR(255) UNIQUE NOT NULL, data MEDIUMTEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1)`);
     },
   },
+  {
+    id: '005_job_roles',
+    async up(query) {
+      await query(`CREATE TABLE IF NOT EXISTS job_roles (id VARCHAR(191) PRIMARY KEY, name VARCHAR(255) UNIQUE NOT NULL, source_id VARCHAR(191), cbo VARCHAR(120), data MEDIUMTEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1)`);
+    },
+  },
 ];
 
 export async function runMigrations(query, driver) {

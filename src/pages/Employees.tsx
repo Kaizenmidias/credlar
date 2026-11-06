@@ -71,6 +71,7 @@ export default function Employees({ contractFilter }: { contractFilter?: 'CLT' |
   const [params] = useSearchParams();
   const [search, setSearch] = useState(params.get('busca') || ''),
     [status, setStatus] = useState(''),
+    [jobTitle, setJobTitle] = useState(''),
     [contractType, setContractType] = useState(''),
     [dept, setDept] = useState(filters.department),
     [page, setPage] = useState(1),
@@ -91,6 +92,7 @@ export default function Employees({ contractFilter }: { contractFilter?: 'CLT' |
       (e.name + e.registration + e.cpf).toLowerCase().includes(search.toLowerCase()) &&
       (!status || e.status === status) &&
       (!selectedContractType || (e.contractType || 'CLT') === selectedContractType) &&
+      (!jobTitle || e.jobTitle === jobTitle) &&
       (!dept || e.departmentId === dept),
   ).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   const edit = (e?: Employee) => {
@@ -240,6 +242,10 @@ export default function Employees({ contractFilter }: { contractFilter?: 'CLT' |
               {['Ativo', 'Férias', 'Afastado', 'Desligado'].map((s) => (
                 <option key={s}>{s}</option>
               ))}
+            </select>
+            <select aria-label="Filtrar cargo" value={jobTitle} onChange={(e) => { setJobTitle(e.target.value); setPage(1); }}>
+              <option value="">Todos os cargos</option>
+              {[...new Set(data.employees.map((e) => e.jobTitle).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR')).map((role) => <option key={role}>{role}</option>)}
             </select>
             {!contractFilter && <select aria-label="Filtrar regime" value={contractType} onChange={(e) => { setContractType(e.target.value); setPage(1); }}>
               <option value="">CLT e PJ</option>
