@@ -84,7 +84,10 @@ export function audit(employees, punches, start, end, company, reviews = [], occ
   for (const e of employees)
     for (const date of daysBetween(start, end)) {
       const group = punches.filter((p) => p.employeeId === e.id && p.date === date);
-      const times = group.flatMap((p) => p.times);
+      // A Sólides pode devolver mais de uma linha para o mesmo dia. A auditoria deve
+      // analisar o conjunto diário, e não criar um alerta separado para cada linha.
+      const times = group.flatMap((p) => Array.isArray(p.times) ? p.times : []).filter(Boolean)
+        .sort((a, b) => minutes(a) - minutes(b));
       const justified = occurrences.find((item) => item.employeeId === e.id && item.status !== 'Pendente' && item.startDate <= date && (item.endDate || item.startDate) >= date);
       if (justified) continue;
       if (!scheduled(e, date, company.holidays) && !times.length) continue;

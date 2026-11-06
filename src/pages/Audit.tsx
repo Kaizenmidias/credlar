@@ -31,7 +31,8 @@ export default function Audit() {
     [page, setPage] = useState(1),
     [detail, setDetail] = useState<any>(null),
     [note, setNote] = useState(''),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [selected, setSelected] = useState<string[]>([]);
   const analyze = () => {
     try {
       const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(
@@ -54,12 +55,13 @@ export default function Audit() {
         ),
       );
       setPage(1);
+      setSelected([]);
       notify('Análise concluída. Alertas precisam de conferência humana.');
     } catch (e) {
       notify((e as Error).message, 'red');
     }
   };
-  const rows = result?.filter((r) => filter === 'all' || r.severity === filter) || [];
+  const rows = (result?.filter((r) => filter === 'all' || r.severity === filter) || []).sort((a, b) => a.employee.name.localeCompare(b.employee.name, 'pt-BR') || a.date.localeCompare(b.date));
   const review = async (status: string) => {
     if (!note.trim()) {
       notify('Registre a observação ou justificativa da conferência.', 'red');
@@ -94,6 +96,19 @@ export default function Audit() {
     } finally {
       setBusy(false);
     }
+  };
+  const bulkReview = async (status: string) => {
+    if (!selected.length) return notify('Selecione ao menos uma inconsistência.', 'orange');
+    setBusy(true);
+    try {
+      for (const id of selected) {
+        const row = rows.find((item) => item.id === id);
+        if (!row) continue;
+        await api('/records/reviews', 'POST', { key: row.id, employeeId: row.employee.id, date: row.date, status, note: 'Conferência realizada em lote.', history: [{ status, note: 'Conferência realizada em lote.', actor: data.user.name, at: new Date().toISOString() }] });
+      }
+      setSelected([]); await reload(); analyze(); notify(`${selected.length} inconsistências atualizadas.`);
+    } catch (e) { notify((e as Error).message, 'red'); }
+    finally { setBusy(false); }
   };
   return (
     <>
@@ -150,6 +165,10 @@ export default function Audit() {
           <Card>
             <div className="table-toolbar">
               <h2>Resultado da análise</h2>
+              <div className="button-row">
+                <label><input type="checkbox" checked={rows.length > 0 && selected.length === rows.length} onChange={(e) => setSelected(e.target.checked ? rows.map((r) => r.id) : [])} /> Selecionar todos</label>
+                <Button variant="secondary" disabled={!selected.length || busy} onClick={() => bulkReview('Conferido na Sólides')}>Dar baixa nos selecionados</Button>
+              </div>
               <select
                 aria-label="Filtrar classificação"
                 value={filter}
@@ -168,6 +187,7 @@ export default function Audit() {
               <table>
                 <thead>
                   <tr>
+                    <th aria-label="Selecionar"></th>
                     <th>Funcionário / matrícula</th>
                     <th>Departamento</th>
                     <th>Data</th>
@@ -187,6 +207,9 @@ export default function Audit() {
                         setNote(r.note);
                       }}
                     >
+                      <td>
+                        <input type="checkbox" checked={selected.includes(r.id)} onChange={(e) => { e.stopPropagation(); setSelected((prev) => e.target.checked ? [...new Set([...prev, r.id])] : prev.filter((id) => id !== r.id)); }} onClick={(e) => e.stopPropagation()} />
+                      </td>
                       <td>
                         <b>{r.employee.name}</b>
                         <small className="cell-small">{r.employee.registration}</small>
