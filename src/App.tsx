@@ -322,16 +322,12 @@ export default function App() {
           </div>
           <nav aria-label="Menu principal">
             <div className="nav-primary-items">
-              {nav.slice(0, 4).map(([path, label, Icon]) => (
+              {nav.slice(0, 5).map(([path, label, Icon]) => (
                 <NavLink to={path} end title={label} key={path}>
                   <Icon size={19} />
                   <span>{label}</span>
                 </NavLink>
               ))}
-              <NavLink to="/pessoa-juridica" end title="Pessoa Jurídica">
-                <Users size={19} />
-                <span>Pessoa Jurídica</span>
-              </NavLink>
             </div>
             {navGroups.map((group) => {
               const isOpen = openMenu === group.id;
