@@ -40,6 +40,7 @@ export default function Audit() {
       );
       const emps = data.employees.filter(
         (e) =>
+          e.contractType !== 'PJ' &&
           (!f.department || e.departmentId === f.department) &&
           (!f.employee || e.id === f.employee),
       );
