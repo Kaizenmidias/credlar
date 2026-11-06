@@ -137,6 +137,7 @@ export default function Employees({ contractFilter }: { contractFilter?: 'CLT' |
         });
         defaultDepartmentId = department.id;
       }
+      const departmentsByName = new Map(data.departments.map((department) => [department.name.trim().toLowerCase(), department.id]));
       for (const row of solidesRows) {
         const name = row.name || row.fullName || row.nome || row.employeeName;
         const registration = String(row.registration || row.registrationNumber || row.matricula || row.id || '').trim();
@@ -144,7 +145,17 @@ export default function Employees({ contractFilter }: { contractFilter?: 'CLT' |
         try {
           const importedContractType = /pj|prestador|jur[ií]dica/i.test(String(row.contractType || row.contractTypeName || row.type || '')) ? 'PJ' : 'CLT';
           const solidesDepartmentId = String(row.departmentId || row.department?.id || '');
-          const departmentId = data.departments.some((department) => department.id === solidesDepartmentId) ? solidesDepartmentId : defaultDepartmentId;
+          const solidesDepartmentName = String(row.departmentName || row.department?.name || row.departmentDTO?.name || row.workplaceName || row.workplace?.name || row.unitName || row.unit?.name || '').trim();
+          let departmentId = data.departments.some((department) => department.id === solidesDepartmentId) ? solidesDepartmentId : '';
+          if (!departmentId && solidesDepartmentName) {
+            departmentId = departmentsByName.get(solidesDepartmentName.toLowerCase()) || '';
+            if (!departmentId) {
+              const created = await api('/departments', 'POST', { name: solidesDepartmentName, manager: '', description: 'Importado automaticamente da Sólides.', color: '#3764eb', weekdays: [1, 2, 3, 4, 5], vaDeductions: ['Falta injustificada', 'Suspensão'], vtDeductions: ['Falta injustificada', 'Atestado', 'Férias'], sundayPolicy: 'Revisão por escala e convenção coletiva', womenSundayRest: 2, contractType: importedContractType === 'PJ' ? 'PJ' : 'CLT' });
+              departmentId = created.id;
+              departmentsByName.set(solidesDepartmentName.toLowerCase(), departmentId);
+            }
+          }
+          if (!departmentId) departmentId = defaultDepartmentId;
           await api('/employees', 'POST', { ...blank, name, registration, contractType: importedContractType, departmentId, cpf: row.cpf || '', email: row.email || '', jobTitle: row.jobTitle || row.role || row.jobRoleDTO?.name || 'Revisar cargo', admissionDate: solidesDate(row.admissionDate) || blank.admissionDate, scheduleName: solidesSchedule(row), salary: Number(row.salary || 0), solidesData: row });
           imported++;
         } catch (e) { skipped++; if (!firstError) firstError = (e as Error).message; }
