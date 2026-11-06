@@ -714,6 +714,7 @@ export async function createApp(db, { production = false, demo = false } = {}) {
     if (!saved) return res.status(422).json({ message: 'Salve o token da Sólides antes de sincronizar.' });
     const token = decryptSecret(saved);
     const employees = (await db.query('SELECT id,data FROM employees')).rows.map((row) => ({ id: row.id, ...JSON.parse(row.data || '{}') }));
+    const sourceEmployeeMap = new Map(employees.map((employee) => [String(employee.solidesData?.id || employee.solidesData?.employeeId || employee.solidesData?.tangerinoId || ''), employee.id]));
     const toDate = (stamp) => {
       if (!stamp) return '';
       const d = new Date(Number(stamp));
@@ -734,6 +735,23 @@ export async function createApp(db, { production = false, demo = false } = {}) {
     }))].sort((a, b) => a - b);
     let imported = 0; let updated = 0; let skipped = 0; let errors = 0; const errorDetails = [];
     const scheduleCache = new Map();
+    // Converte ajustes já sincronizados da Sólides em ocorrências do sistema.
+    // Assim a auditoria consegue distinguir ausência real de falta justificada/folga/atestado etc.
+    const adjustmentRows = (await db.query("SELECT data FROM records WHERE kind='solides_adjustments'")).rows;
+    for (const row of adjustmentRows) {
+      try {
+        const wrapper = JSON.parse(row.data || '{}'); const raw = wrapper.payload || wrapper;
+        const internalEmployeeId = sourceEmployeeMap.get(String(raw.employeeDTO?.id || raw.employeeId || ''));
+        const start = toDate(raw.startDate); const end = toDate(raw.endDate || raw.startDate);
+        const reason = String(raw.adjustmentReasonDTO?.description || raw.reason || raw.type || 'Justificativa importada da Sólides');
+        if (!internalEmployeeId || !start) continue;
+        const externalKey = digest(`solides-occurrence|${raw.id || wrapper.externalId}|${internalEmployeeId}`);
+        const payload = { employeeId: internalEmployeeId, type: reason, startDate: start, endDate: end || start, days: 1, note: raw.observation || 'Importado da Sólides.', origin: 'Sólides', status: String(raw.status || '').toUpperCase() === 'APROVADO' ? 'Conferido' : 'Pendente', solidesData: raw };
+        const current = (await db.query('SELECT id FROM records WHERE external_key=?', [externalKey])).rows[0];
+        if (current) await db.query('UPDATE records SET data=?,version=version+1 WHERE id=?', [JSON.stringify({ ...payload, id: current.id }), current.id]);
+        else await db.query('INSERT INTO records(id,kind,external_key,data) VALUES (?,?,?,?)', [randomUUID(), 'occurrences', externalKey, JSON.stringify(payload)]);
+      } catch { /* um ajuste incompleto não impede a importação das marcações */ }
+    }
     for (const employee of employees) {
       const source = employee.solidesData || {};
       const sourceId = source.id || source.employeeId || source.tangerinoId;

@@ -50,6 +50,7 @@ export default function Audit() {
           f.end < today ? f.end : today,
           data.company,
           data.records.filter((r) => r.kind === 'reviews'),
+          data.records.filter((r) => r.kind === 'occurrences'),
         ),
       );
       setPage(1);

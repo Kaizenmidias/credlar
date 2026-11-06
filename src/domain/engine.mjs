@@ -79,12 +79,14 @@ export function benefit(e, department, occurrences, start, end, company, type = 
     },
   };
 }
-export function audit(employees, punches, start, end, company, reviews = []) {
+export function audit(employees, punches, start, end, company, reviews = [], occurrences = []) {
   const out = [];
   for (const e of employees)
     for (const date of daysBetween(start, end)) {
       const group = punches.filter((p) => p.employeeId === e.id && p.date === date);
       const times = group.flatMap((p) => p.times);
+      const justified = occurrences.find((item) => item.employeeId === e.id && item.status !== 'Pendente' && item.startDate <= date && (item.endDate || item.startDate) >= date);
+      if (justified) continue;
       if (!scheduled(e, date, company.holidays) && !times.length) continue;
       const issues = [];
       let severity = 'green';
