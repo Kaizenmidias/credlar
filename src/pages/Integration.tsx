@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   PlugZap,
   ExternalLink,
@@ -46,8 +46,11 @@ export default function Integration() {
     [punchEnd, setPunchEnd] = useState(new Date().toISOString().slice(0, 10)),
     [syncingPunches, setSyncingPunches] = useState(false),
     [punchResult, setPunchResult] = useState<any>(null),
+    [jobs, setJobs] = useState<any[]>([]),
     [dataView, setDataView] = useState<any>(null),
     [dataViewBusy, setDataViewBusy] = useState(false);
+  const loadJobs = () => isAdmin ? api('/integration/jobs').then(setJobs).catch(() => {}) : Promise.resolve();
+  useEffect(() => { loadJobs(); const timer = setInterval(loadJobs, 10000); return () => clearInterval(timer); }, [isAdmin]);
   const previewApi = async () => {
     setApiBusy(true); setApiRows([]); setError('');
     try {
@@ -324,6 +327,7 @@ export default function Integration() {
               try {
                 const result = await api('/integration/solides/sync-punches', 'POST', { startDate: punchStart, endDate: punchEnd });
                 setPunchResult(result); await reload();
+                await loadJobs();
                 notify(`Marcações importadas: ${result.imported} novas e ${result.updated} atualizadas.`, result.errors ? 'orange' : 'green');
               } catch (e) { setError((e as Error).message); notify((e as Error).message, 'red'); }
               finally { setSyncingPunches(false); }
@@ -397,6 +401,7 @@ export default function Integration() {
           ))}
         </div>
       </Card>
+      {isAdmin && <Card className="padded"><div className="card-heading"><div><h2>Histórico de sincronizações</h2><p>Progresso persistente e diagnóstico das últimas execuções.</p></div><Button variant="secondary" onClick={loadJobs}><RefreshCw size={16}/> Atualizar</Button></div><div className="table-wrap"><table><thead><tr><th>Início</th><th>Tipo</th><th>Status</th><th>Progresso</th><th>Resultado</th><th /></tr></thead><tbody>{jobs.map((job) => <tr key={job.id}><td>{new Date(job.startedAt).toLocaleString('pt-BR')}</td><td>{job.type === 'punches-and-schedules' ? 'Pontos e escalas' : job.type}</td><td><Badge tone={job.status === 'completed' ? 'green' : job.status === 'running' ? 'blue' : 'orange'}>{job.status}</Badge></td><td>{job.progress} / {job.total}</td><td>{job.message}</td><td>{job.status === 'running' && <Button variant="secondary" onClick={async () => { await api(`/integration/jobs/${job.id}/cancel`, 'POST'); await loadJobs(); }}>Cancelar</Button>}</td></tr>)}{!jobs.length && <tr><td colSpan={6} className="empty-cell">Nenhuma sincronização registrada nesta versão.</td></tr>}</tbody></table></div></Card>}
       <Card className="padded">
         <h2>Dados trazidos da Sólides</h2>
         <p className="muted">Consulte cada conjunto já armazenado. Os nomes técnicos são apresentados em linguagem de negócio e a resposta original continua preservada no servidor.</p>

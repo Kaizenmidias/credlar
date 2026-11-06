@@ -15,7 +15,7 @@ import { Card, PageTitle, Button, Badge, Notice } from '../components/ui';
 import PeriodFilter from '../components/PeriodFilter';
 import { calculate } from '../lib/calculations';
 import { audit } from '../domain/engine.mjs';
-import { currency, dateBR } from '../lib/api';
+import { api, currency, dateBR } from '../lib/api';
 import { exportReport } from '../lib/export';
 const reports = [
   ['employees', 'Funcionários', 'Cadastro geral da equipe', Users],
@@ -122,6 +122,7 @@ export default function Reports() {
         rows,
         `${f.competence} · ${dateBR(f.start)} a ${dateBR(f.end)}`,
       );
+      await api('/reports/log', 'POST', { reportType: id, format, competence: f.competence, start: f.start, end: f.end, employeeId: f.employee, departmentId: f.department, closingId: '' });
       notify(`Relatório ${format.toUpperCase()} gerado com a identidade da empresa.`);
     } catch (e) {
       notify((e as Error).message, 'red');

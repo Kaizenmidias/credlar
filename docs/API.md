@@ -72,6 +72,13 @@ Datas civis ISO sem fuso; instantes de auditoria ISO UTC. Registros de ponto atu
 | GET /settings/smtp                                      | admin; configuração sem retornar a senha                                |
 | PUT /settings/smtp                                      | admin; salva host/porta/remetente e senha criptografada                  |
 | POST /settings/smtp/test                                | admin; valida conexão/autenticação SMTP                                  |
+| GET /integration/jobs                                  | admin; histórico e progresso das sincronizações                          |
+| POST /integration/jobs/:id/cancel                      | admin; solicita cancelamento cooperativo                                 |
+| GET /documents?occurrenceId=                           | autenticado; lista metadados sem expor caminho privado                   |
+| POST /documents                                         | admin/rh; PDF/PNG/JPEG, assinatura real e limite de 5 MB                 |
+| GET /documents/:id/download                            | autenticado; download autorizado                                         |
+| DELETE /documents/:id                                  | admin/rh; remove metadado e arquivo privado                              |
+| GET /operations/backups                                | admin; inventário de backups criptografados                              |
 | GET /employees?page&pageSize&search&departmentId&status | listagem paginada, total e ordenação                                    |
 | GET /dashboard?start&end&departmentId                   | agregados e séries reais                                                |
 | PUT /integrations/solides/credentials                   | criptografar token, aceitar apenas admin, nunca retorná-lo              |

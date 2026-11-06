@@ -34,11 +34,11 @@ Marcar `[x]` somente com código e evidência de verificação. Itens com `[ ]` 
 - [x] F2-09 Conexão verdadeira, permissões e paginação testadas com a conta do cliente.
 - [x] F2-09a Campo administrativo para salvar token pelo front com criptografia AES-256-GCM; teste externo aguarda token novo.
 - [x] F2-10 Importar funcionários, departamentos, unidades, cargos, escalas, pontos e ajustes/justificativas disponibilizados pela conta, preservando payload bruto.
-- [ ] F2-11 Job persistente, checkpoints, transação por lote, retries 429/5xx, status e cancelamento.
-- [ ] F2-12 IDs externos e deduplicação transacional; correções na origem e invalidação de revisões.
+- [ ] F2-11 Job persistente com progresso, histórico, retries 429/5xx, status e cancelamento implementados. Ainda faltam retomada por checkpoint e transação por lote.
+- [x] F2-12 IDs externos, deduplicação e invalidação automática de revisões quando a origem do ponto muda.
 - [ ] F2-13 Mapear exportações nativas Sólides (não confundir com modelo normalizado).
 - [ ] F2-14 Escalas com horários detalhados para 2/4/6+ batidas; comparação de cada intervalo e jornada prevista/real.
-- [ ] F2-15 Ocorrências: anexos privados, MIME real, antivírus, download autorizado, retenção.
+- [ ] F2-15 Ocorrências: anexos fora do webroot, validação por assinatura real, limite e download autenticado implementados. Ainda faltam antivírus e política de retenção documental.
 
 ## Fase 3 — Cálculos
 
@@ -67,7 +67,7 @@ Marcar `[x]` somente com código e evidência de verificação. Itens com `[ ]` 
 - [x] F4-06 Snapshot imutável de conferência com identidade da empresa, período, funcionários, memórias, totais em centavos e pendências.
 - [x] F4-07 Exibir pendências e exigir ciência explícita, justificativa e perfil administrador antes de finalizar; finalização continua condicionada à homologação por ambiente.
 - [x] F4-08 Reabrir com justificativa obrigatória, criar nova versão em rascunho e preservar versão finalizada anterior.
-- [ ] F4-09 Relatórios oficiais no servidor vinculados ao snapshot e histórico de geração/acesso.
+- [ ] F4-09 Histórico de geração/acesso implementado. Ainda faltam geração oficial no servidor e vínculo obrigatório ao snapshot finalizado.
 - [ ] F4-10 Homologação visual PDF multipágina e Excel no leitor utilizado pelo DHO.
 
 ## Operação e privacidade — antes de dados reais
@@ -75,7 +75,7 @@ Marcar `[x]` somente com código e evidência de verificação. Itens com `[ ]` 
 - [x] Segredos e banco ignorados pelo Git; sem tokens de API no código.
 - [x] SQL parametrizado, validação no servidor, origem/cabeçalho anti-CSRF e limite no login.
 - [ ] Política de retenção, finalidade, responsável, direitos do titular e gestão de incidentes.
-- [ ] Criptografia de backups, armazenamento privado, retenção e restauração testada.
+- [ ] Backups MySQL criptografados, privados e com retenção automática implementados. Restauração isolada ainda precisa ser ensaiada e registrada.
 - [ ] Logs append-only com diffs mascarados; permissões por campo/dado médico.
 - [x] Health/readiness e expurgo horário de sessões e tokens expirados.
 - [ ] Monitoramento externo, alarmes e procedimento de rollback ensaiado.

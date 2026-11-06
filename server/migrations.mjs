@@ -64,6 +64,20 @@ export const migrations = [
       await query(`CREATE TABLE IF NOT EXISTS smtp_settings (id VARCHAR(191) PRIMARY KEY, host VARCHAR(255) NOT NULL, port INTEGER NOT NULL, secure INTEGER NOT NULL DEFAULT 1, username VARCHAR(255) NOT NULL, from_name VARCHAR(255) NOT NULL, from_email VARCHAR(255) NOT NULL, ciphertext MEDIUMTEXT NOT NULL, iv VARCHAR(100) NOT NULL, auth_tag VARCHAR(100) NOT NULL, updated_at VARCHAR(40) NOT NULL)`);
     },
   },
+  {
+    id: '007_import_jobs',
+    async up(query) {
+      await query(`CREATE TABLE IF NOT EXISTS import_jobs (id VARCHAR(191) PRIMARY KEY, provider VARCHAR(40) NOT NULL, job_type VARCHAR(80) NOT NULL, status VARCHAR(30) NOT NULL, progress INTEGER NOT NULL DEFAULT 0, total INTEGER NOT NULL DEFAULT 0, message MEDIUMTEXT, data MEDIUMTEXT NOT NULL, cancel_requested INTEGER NOT NULL DEFAULT 0, started_at VARCHAR(40) NOT NULL, finished_at VARCHAR(40))`);
+      await query(`CREATE INDEX import_jobs_started ON import_jobs(started_at)`).catch((error) => { if (!/duplicate|exists/i.test(error.message)) throw error; });
+    },
+  },
+  {
+    id: '008_private_documents',
+    async up(query) {
+      await query(`CREATE TABLE IF NOT EXISTS documents (id VARCHAR(191) PRIMARY KEY, occurrence_id VARCHAR(191) NOT NULL, original_name VARCHAR(255) NOT NULL, mime_type VARCHAR(100) NOT NULL, size_bytes INTEGER NOT NULL, storage_path VARCHAR(500) NOT NULL, uploaded_by VARCHAR(191) NOT NULL, created_at VARCHAR(40) NOT NULL)`);
+      await query(`CREATE INDEX documents_occurrence ON documents(occurrence_id)`).catch((error) => { if (!/duplicate|exists/i.test(error.message)) throw error; });
+    },
+  },
 ];
 
 export async function runMigrations(query, driver) {

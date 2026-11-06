@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Plus, ClipboardList, CheckCircle2, MoreHorizontal } from 'lucide-react';
 import { useDho } from '../context';
@@ -13,8 +13,10 @@ export default function Occurrences() {
     [page, setPage] = useState(1),
     [pageSize, setPageSize] = useState(10),
     [edit, setEdit] = useState<any>(null),
+    [documents, setDocuments] = useState<any[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
+  useEffect(() => { if (edit?.id) api(`/documents?occurrenceId=${encodeURIComponent(edit.id)}`).then(setDocuments).catch(() => setDocuments([])); else setDocuments([]); }, [edit?.id]);
   const rows = data.records.filter(
     (r) =>
       r.kind === 'occurrences' &&
@@ -206,10 +208,7 @@ export default function Occurrences() {
                 </Field>
               </div>
             </fieldset>
-            <Notice>
-              Documentos anexos serão habilitados na Fase 2, com armazenamento privado e controle de
-              acesso. Não inclua informações médicas no campo de observação.
-            </Notice>
+            {edit.id ? <div className="document-box"><Field label="Documento privado (PDF, PNG ou JPEG · até 5 MB)"><input type="file" accept="application/pdf,image/png,image/jpeg" disabled={!canEdit || busy} onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = async () => { setBusy(true); try { await api('/documents', 'POST', { occurrenceId: edit.id, name: file.name, mime: file.type, base64: String(reader.result) }); setDocuments(await api(`/documents?occurrenceId=${encodeURIComponent(edit.id)}`)); notify('Documento armazenado com acesso restrito.', 'green'); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }; reader.readAsDataURL(file); }} /></Field>{documents.map((document) => <div className="checklist-row" key={document.id}><a href={`/api/documents/${document.id}/download`}><b>{document.name}</b></a><span>{Math.ceil(document.size / 1024)} KB</span>{canEdit && <button type="button" className="icon-btn" title="Remover documento" onClick={async () => { await api(`/documents/${document.id}`, 'DELETE'); setDocuments(documents.filter((item) => item.id !== document.id)); }}><MoreHorizontal size={16}/></button>}</div>)}<Notice tone="orange">Arquivos ficam fora do diretório público e exigem autenticação. A varredura antivírus ainda depende de um serviço instalado na VPS.</Notice></div> : <Notice>Salve a ocorrência primeiro para anexar documentos privados.</Notice>}
             {error && <Notice tone="red">{error}</Notice>}
             <div className="modal-footer">
               <Button type="button" variant="secondary" onClick={() => setEdit(null)}>

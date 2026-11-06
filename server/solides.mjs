@@ -13,11 +13,18 @@ async function solidesFetch({ baseUrl, token, path, params = {} }) {
   const normalizedToken = String(token || '').replace(/^Basic\s+/i, '').trim();
   const url = new URL(path, baseUrl);
   Object.entries(params).forEach(([key, value]) => value != null && url.searchParams.set(key, String(value)));
-  const response = await fetch(url, { headers: { Accept: 'application/json', Authorization: `Basic ${normalizedToken}` } });
-  const text = await response.text();
-  let body; try { body = text ? JSON.parse(text) : null; } catch { body = text; }
-  if (!response.ok) throw Object.assign(new Error(`Sólides respondeu HTTP ${response.status}.`), { status: response.status, body });
-  return body;
+  let lastError;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const response = await fetch(url, { headers: { Accept: 'application/json', Authorization: `Basic ${normalizedToken}` }, signal: AbortSignal.timeout(30000) });
+    const text = await response.text();
+    let body; try { body = text ? JSON.parse(text) : null; } catch { body = text; }
+    if (response.ok) return body;
+    lastError = Object.assign(new Error(`Sólides respondeu HTTP ${response.status}.`), { status: response.status, body });
+    if (response.status !== 429 && response.status < 500) throw lastError;
+    const retryAfter = Number(response.headers.get('retry-after'));
+    await new Promise((resolve) => setTimeout(resolve, Number.isFinite(retryAfter) ? retryAfter * 1000 : 500 * (2 ** attempt)));
+  }
+  throw lastError;
 }
 
 export const SOLIDES_DATASETS = [

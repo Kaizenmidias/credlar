@@ -28,6 +28,7 @@ export default function Configuration() {
     [edit, setEdit] = useState<any>(null),
     [holiday, setHoliday] = useState(''),
     [smtp, setSmtp] = useState<any>({ host: '', port: 465, secure: true, username: '', password: '', fromName: 'DPControl', fromEmail: '' }),
+    [backups, setBackups] = useState<any[]>([]),
     [error, setError] = useState('');
   useEffect(() => {
     if (tab === 'users' && isAdmin)
@@ -40,6 +41,7 @@ export default function Configuration() {
         .catch((e) => notify(e.message, 'red'));
     if (tab === 'smtp' && isAdmin)
       api('/settings/smtp').then((value) => setSmtp({ ...smtp, ...value, password: '' })).catch((e) => notify(e.message, 'red'));
+    if (tab === 'operations' && isAdmin) api('/operations/backups').then(setBackups).catch((e) => notify(e.message, 'red'));
   }, [tab]);
   const set = (key: string, value: any) => setCompany({ ...company, [key]: value });
   const save = async () => {
@@ -87,6 +89,7 @@ export default function Configuration() {
             ['calendar', 'Calendário e feriados', CalendarDays],
             ['users', 'Usuários e permissões', Users],
             ['smtp', 'E-mail e recuperação', Mail],
+            ['operations', 'Operação e backups', ShieldCheck],
             ['history', 'Histórico de alterações', History],
           ].map(([k, l, Icon]: any) => (
             <button key={k} className={tab === k ? 'active' : ''} onClick={() => setTab(k)}>
@@ -432,6 +435,9 @@ export default function Configuration() {
                 </div>
               </fieldset>}
             </>
+          )}
+          {tab === 'operations' && (
+            <><h2>Operação e backups</h2><p className="muted">Inventário dos backups MySQL criptografados armazenados fora do diretório público.</p>{!isAdmin ? <Notice>Somente administradores podem consultar esta área.</Notice> : <><Notice tone="green">A aplicação possui endpoints de health e readiness. Os arquivos abaixo são criptografados antes de serem gravados.</Notice><div className="table-wrap"><table><thead><tr><th>Backup</th><th>Data</th><th>Tamanho criptografado</th></tr></thead><tbody>{backups.map((backup) => <tr key={backup.name}><td><b>{backup.name}</b></td><td>{new Date(backup.createdAt).toLocaleString('pt-BR')}</td><td>{(backup.size / 1024 / 1024).toFixed(2)} MB</td></tr>)}{!backups.length && <tr><td colSpan={3} className="empty-cell">Nenhum backup registrado nesta rotina.</td></tr>}</tbody></table></div></>}</>
           )}
         </Card>
       </div>

@@ -8,8 +8,8 @@ import { digest, verifyPassword } from '../server/security.mjs';
 test('Fase 1: sessão, CRUD, RBAC, validação, duplicidade e histórico', async (t) => {
   process.env.TEST_DB = ':memory:';
   const db = await connectDb();
-  assert.deepEqual(db.migrationIds, ['001_base_schema', '002_rules_and_closings', '003_encrypted_integration_credentials', '004_units', '005_job_roles', '006_smtp_settings']);
-  assert.equal((await db.query('SELECT id FROM schema_migrations')).rows.length, 6);
+  assert.deepEqual(db.migrationIds, ['001_base_schema', '002_rules_and_closings', '003_encrypted_integration_credentials', '004_units', '005_job_roles', '006_smtp_settings', '007_import_jobs', '008_private_documents']);
+  assert.equal((await db.query('SELECT id FROM schema_migrations')).rows.length, 8);
   await seed(db, { demo: true });
   const app = await createApp(db, { demo: true });
   const server = app.listen(0, '127.0.0.1');
@@ -145,6 +145,16 @@ test('Fase 1: sessão, CRUD, RBAC, validação, duplicidade e histórico', async
       };
       assert.equal((await req('/records/punches', 'POST', record)).status, 201);
       assert.equal((await req('/records/punches', 'POST', record)).data.duplicate, true);
+    });
+    await t.test('documento de ocorrência fica privado e valida assinatura real', async () => {
+      const occurrence = await req('/records/occurrences', 'POST', { employeeId: boot.employees[0].id, type: 'Atestado', startDate: '2026-11-01', endDate: '2026-11-01', note: 'Documento de teste', status: 'Conferido', source: 'Manual' });
+      const invalid = await req('/documents', 'POST', { occurrenceId: occurrence.data.id, name: 'falso.pdf', mime: 'application/pdf', base64: Buffer.from('não é pdf').toString('base64') });
+      assert.equal(invalid.status, 422);
+      const uploaded = await req('/documents', 'POST', { occurrenceId: occurrence.data.id, name: 'atestado.pdf', mime: 'application/pdf', base64: Buffer.from('%PDF-1.4\nteste').toString('base64') });
+      assert.equal(uploaded.status, 201);
+      const documents = await req(`/documents?occurrenceId=${occurrence.data.id}`);
+      assert.equal(documents.data.length, 1);
+      assert.equal((await req(`/documents/${uploaded.data.id}`, 'DELETE')).status, 200);
     });
     await t.test('fechamento definitivo é bloqueado até homologação', async () =>
       assert.equal((await req('/records/closings', 'POST', {})).status, 422),

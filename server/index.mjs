@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { randomUUID, randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
+import { mkdir, readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { connectDb } from './db.mjs';
 import { seed } from './seed.mjs';
@@ -668,6 +669,50 @@ export async function createApp(db, { production = false, demo = false } = {}) {
       ).rows,
     ),
   );
+  app.post('/api/reports/log', write, async (req, res) => {
+    const input = z.object({ reportType: z.string().min(1).max(80), format: z.enum(['pdf', 'xlsx']), competence: z.string().max(7), start: date, end: date, employeeId: z.string().default(''), departmentId: z.string().default(''), closingId: z.string().default('') }).parse(req.body);
+    await log(req, 'generate', 'reports', input.closingId || null, input);
+    res.status(201).json({ ok: true });
+  });
+  app.get('/api/operations/backups', admin, async (_, res) => {
+    const directory = resolve(process.env.BACKUP_DIRECTORY || 'var/backups');
+    const files = await readdir(directory).catch(() => []);
+    const rows = await Promise.all(files.filter((file) => file.endsWith('.sql.gz.enc')).map(async (file) => { const info = await stat(resolve(directory, file)); return { name: file, size: info.size, createdAt: info.mtime.toISOString() }; }));
+    res.json(rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+  });
+  app.get('/api/documents', async (req, res) => {
+    const occurrenceId = z.string().min(1).parse(req.query.occurrenceId);
+    const rows = (await db.query('SELECT id,occurrence_id,original_name,mime_type,size_bytes,created_at FROM documents WHERE occurrence_id=? ORDER BY created_at DESC', [occurrenceId])).rows;
+    res.json(rows.map((row) => ({ id: row.id, occurrenceId: row.occurrence_id, name: row.original_name, mime: row.mime_type, size: Number(row.size_bytes), createdAt: row.created_at })));
+  });
+  app.post('/api/documents', write, async (req, res) => {
+    const input = z.object({ occurrenceId: z.string().min(1), name: z.string().min(1).max(255), mime: z.enum(['application/pdf', 'image/png', 'image/jpeg']), base64: z.string().min(4) }).parse(req.body);
+    const occurrence = (await db.query("SELECT id FROM records WHERE id=? AND kind='occurrences'", [input.occurrenceId])).rows[0];
+    if (!occurrence) return res.status(404).json({ message: 'Ocorrência não encontrada.' });
+    const buffer = Buffer.from(input.base64.replace(/^data:[^;]+;base64,/, ''), 'base64');
+    if (!buffer.length || buffer.length > 5 * 1024 * 1024) return res.status(422).json({ message: 'Documento vazio ou maior que 5 MB.' });
+    const valid = input.mime === 'application/pdf' ? buffer.subarray(0, 4).toString() === '%PDF' : input.mime === 'image/png' ? buffer.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10])) : buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+    if (!valid) return res.status(422).json({ message: 'O conteúdo do arquivo não corresponde ao tipo informado.' });
+    const id = randomUUID(), extension = input.mime === 'application/pdf' ? 'pdf' : input.mime === 'image/png' ? 'png' : 'jpg';
+    const directory = resolve('var/private-documents'); const path = resolve(directory, `${id}.${extension}`);
+    await mkdir(directory, { recursive: true }); await writeFile(path, buffer, { mode: 0o600 });
+    await db.query('INSERT INTO documents(id,occurrence_id,original_name,mime_type,size_bytes,storage_path,uploaded_by,created_at) VALUES (?,?,?,?,?,?,?,?)', [id, input.occurrenceId, input.name.replace(/[\r\n]/g, ''), input.mime, buffer.length, path, req.user.id, new Date().toISOString()]);
+    await log(req, 'upload', 'documents', id, { occurrenceId: input.occurrenceId, mime: input.mime, size: buffer.length });
+    res.status(201).json({ id, name: input.name, mime: input.mime, size: buffer.length });
+  });
+  app.get('/api/documents/:id/download', async (req, res) => {
+    const document = (await db.query('SELECT * FROM documents WHERE id=?', [req.params.id])).rows[0];
+    if (!document) return res.status(404).json({ message: 'Documento não encontrado.' });
+    const content = await readFile(document.storage_path).catch(() => null);
+    if (!content) return res.status(404).json({ message: 'Arquivo privado indisponível.' });
+    res.set('Content-Type', document.mime_type); res.set('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(document.original_name)}`); res.send(content);
+  });
+  app.delete('/api/documents/:id', write, async (req, res) => {
+    const document = (await db.query('SELECT * FROM documents WHERE id=?', [req.params.id])).rows[0];
+    if (!document) return res.status(404).json({ message: 'Documento não encontrado.' });
+    await db.query('DELETE FROM documents WHERE id=?', [document.id]); await unlink(document.storage_path).catch(() => {});
+    await log(req, 'delete', 'documents', document.id, { occurrenceId: document.occurrence_id }); res.json({ ok: true });
+  });
   app.post('/api/records/:kind', write, async (req, res) => {
     const kind = z.enum(['punches', 'occurrences', 'reviews', 'closings']).parse(req.params.kind);
     const d = z.record(z.string(), z.unknown()).parse(req.body);
@@ -779,12 +824,24 @@ export async function createApp(db, { production = false, demo = false } = {}) {
       res.status(error.status && Number(error.status) >= 400 ? Number(error.status) : 502).json({ message: error.message || 'Não foi possível consultar a Sólides.' });
     }
   });
+  app.get('/api/integration/jobs', admin, async (_, res) => {
+    const rows = (await db.query('SELECT * FROM import_jobs ORDER BY started_at DESC LIMIT 100')).rows;
+    res.json(rows.map((row) => ({ id: row.id, provider: row.provider, type: row.job_type, status: row.status, progress: Number(row.progress), total: Number(row.total), message: row.message || '', data: JSON.parse(row.data || '{}'), cancelRequested: !!row.cancel_requested, startedAt: row.started_at, finishedAt: row.finished_at || '' })));
+  });
+  app.post('/api/integration/jobs/:id/cancel', admin, async (req, res) => {
+    const result = await db.query("UPDATE import_jobs SET cancel_requested=1,message=? WHERE id=? AND status='running'", ['Cancelamento solicitado pelo administrador.', req.params.id]);
+    if (!result.rowCount) return res.status(404).json({ message: 'Job em execução não encontrado.' });
+    await log(req, 'cancel', 'import_jobs', req.params.id);
+    res.json({ ok: true });
+  });
   app.post('/api/integration/solides/sync-punches', admin, async (req, res) => {
     const input = z.object({ startDate: date.default('2025-08-21'), endDate: date.default(new Date().toISOString().slice(0, 10)) }).parse(req.body || {});
     const saved = (await db.query('SELECT * FROM integration_credentials WHERE provider=?', ['solides'])).rows[0];
     if (!saved) return res.status(422).json({ message: 'Salve o token da Sólides antes de sincronizar.' });
     const token = decryptSecret(saved);
     const employees = (await db.query('SELECT id,data FROM employees')).rows.map((row) => ({ id: row.id, ...JSON.parse(row.data || '{}') }));
+    const jobId = randomUUID(), jobStartedAt = new Date().toISOString();
+    await db.query('INSERT INTO import_jobs(id,provider,job_type,status,progress,total,message,data,started_at) VALUES (?,?,?,?,?,?,?,?,?)', [jobId, 'solides', 'punches-and-schedules', 'running', 0, employees.length, 'Sincronização iniciada.', JSON.stringify({ period: input }), jobStartedAt]);
     const sourceEmployeeMap = new Map(employees.map((employee) => [String(employee.solidesData?.id || employee.solidesData?.employeeId || employee.solidesData?.tangerinoId || ''), employee.id]));
     const toDate = (stamp) => {
       if (!stamp) return '';
@@ -805,6 +862,17 @@ export async function createApp(db, { production = false, demo = false } = {}) {
       return day === 1 ? 0 : Math.max(0, Math.min(6, day - 1));
     }))].sort((a, b) => a - b);
     let imported = 0; let updated = 0; let skipped = 0; let errors = 0; const errorDetails = [];
+    let invalidatedReviews = 0; const invalidatedKeys = new Set();
+    const reviewRows = (await db.query("SELECT id,data FROM records WHERE kind='reviews'")).rows.map((row) => ({ id: row.id, ...JSON.parse(row.data || '{}') }));
+    const invalidateReview = async (employeeId, punchDate) => {
+      const key = `${employeeId}:${punchDate}`;
+      if (invalidatedKeys.has(key)) return;
+      const review = reviewRows.find((item) => item.key === key && item.status !== 'Obsoleto');
+      if (!review) return;
+      const next = { ...review, status: 'Obsoleto', note: `${review.note || ''}${review.note ? ' · ' : ''}Revisão invalidada por nova sincronização da Sólides.`, history: [...(review.history || []), { status: 'Obsoleto', note: 'A origem foi alterada após a conferência.', actor: 'Sincronização Sólides', at: new Date().toISOString() }] };
+      await db.query('UPDATE records SET data=?,version=version+1 WHERE id=?', [JSON.stringify(next), review.id]);
+      invalidatedKeys.add(key); invalidatedReviews++;
+    };
     const scheduleCache = new Map();
     // Converte ajustes já sincronizados da Sólides em ocorrências do sistema.
     // Assim a auditoria consegue distinguir ausência real de falta justificada/folga/atestado etc.
@@ -823,10 +891,12 @@ export async function createApp(db, { production = false, demo = false } = {}) {
         else await db.query('INSERT INTO records(id,kind,external_key,data) VALUES (?,?,?,?)', [randomUUID(), 'occurrences', externalKey, JSON.stringify(payload)]);
       } catch { /* um ajuste incompleto não impede a importação das marcações */ }
     }
+    let processed = 0; let cancelled = false;
     for (const employee of employees) {
+      if ((await db.query('SELECT cancel_requested FROM import_jobs WHERE id=?', [jobId])).rows[0]?.cancel_requested) { cancelled = true; break; }
       const source = employee.solidesData || {};
       const sourceId = source.id || source.employeeId || source.tangerinoId;
-      if (!sourceId) { skipped++; continue; }
+      if (!sourceId) { skipped++; processed++; await db.query('UPDATE import_jobs SET progress=? WHERE id=?', [processed, jobId]); continue; }
       try {
         const punches = await fetchSolidesPunches({ baseUrl: saved.base_url, token, employeeId: sourceId, startDate: input.startDate, endDate: input.endDate });
         for (const raw of punches) {
@@ -835,9 +905,15 @@ export async function createApp(db, { production = false, demo = false } = {}) {
           const times = [toTime(raw.startDateTimestamp || raw.startTimestamp || raw.start), toTime(raw.endDateTimestamp || raw.endTimestamp || raw.end)].filter(Boolean);
           const externalKey = digest(`solides-punch|${employee.id}|${punchDate}|${JSON.stringify(times)}|${raw.id || ''}`);
           const payload = { employeeId: employee.id, date: punchDate, times, status: raw.status || 'Importado', source: 'Sólides', solidesData: raw };
-          const current = (await db.query('SELECT id FROM records WHERE external_key=?', [externalKey])).rows[0];
-          if (current) { await db.query('UPDATE records SET data=?,version=version+1 WHERE id=?', [JSON.stringify({ ...payload, id: current.id }), current.id]); updated++; }
-          else { await db.query('INSERT INTO records(id,kind,external_key,data) VALUES (?,?,?,?)', [randomUUID(), 'punches', externalKey, JSON.stringify(payload)]); imported++; }
+          const current = (await db.query('SELECT id,data FROM records WHERE external_key=?', [externalKey])).rows[0];
+          if (current) {
+            const previous = JSON.parse(current.data || '{}');
+            if (JSON.stringify(previous.times || []) !== JSON.stringify(times) || previous.status !== payload.status) await invalidateReview(employee.id, punchDate);
+            await db.query('UPDATE records SET data=?,version=version+1 WHERE id=?', [JSON.stringify({ ...payload, id: current.id }), current.id]); updated++;
+          } else {
+            await invalidateReview(employee.id, punchDate);
+            await db.query('INSERT INTO records(id,kind,external_key,data) VALUES (?,?,?,?)', [randomUUID(), 'punches', externalKey, JSON.stringify(payload)]); imported++;
+          }
         }
         const schedule = source.currentWorkSchedule || source.workSchedule || source.schedule;
         const scheduleId = typeof schedule === 'object' ? schedule?.id : schedule;
@@ -852,8 +928,12 @@ export async function createApp(db, { production = false, demo = false } = {}) {
           await db.query('UPDATE employees SET data=?,version=version+1 WHERE id=?', [JSON.stringify(next), employee.id]);
         }
       } catch (error) { errors++; if (errorDetails.length < 10) errorDetails.push({ employee: employee.name, message: error.message }); }
+      processed++;
+      await db.query('UPDATE import_jobs SET progress=?,message=? WHERE id=?', [processed, `${processed} de ${employees.length} colaboradores processados.`, jobId]);
     }
-    res.json({ ok: errors === 0, startDate: input.startDate, endDate: input.endDate, employees: employees.length, imported, updated, skipped, errors, errorDetails, schedules: scheduleCache.size });
+    const result = { jobId, ok: !cancelled && errors === 0, cancelled, startDate: input.startDate, endDate: input.endDate, employees: employees.length, processed, imported, updated, skipped, errors, errorDetails, schedules: scheduleCache.size, invalidatedReviews };
+    await db.query('UPDATE import_jobs SET status=?,progress=?,message=?,data=?,finished_at=? WHERE id=?', [cancelled ? 'cancelled' : errors ? 'partial' : 'completed', processed, cancelled ? 'Sincronização cancelada.' : errors ? `Concluída com ${errors} erros.` : 'Sincronização concluída.', JSON.stringify(result), new Date().toISOString(), jobId]);
+    res.json(result);
   });
   app.post('/api/integration/solides/sync-all', admin, async (req, res) => {
     const saved = (await db.query('SELECT * FROM integration_credentials WHERE provider=?', ['solides'])).rows[0];
