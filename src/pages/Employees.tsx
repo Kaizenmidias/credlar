@@ -42,6 +42,7 @@ const blank: Omit<Employee, 'id' | 'version'> = {
   status: 'Ativo',
   extraDays: [],
   excludedDays: [],
+  solidesData: {},
 };
 const solidesDate = (value: unknown) => {
   if (!value) return '';
@@ -120,19 +121,29 @@ export default function Employees({ contractFilter }: { contractFilter?: 'CLT' |
     finally { setSolidesBusy(false); }
   };
   const importSolides = async () => {
-    setSolidesBusy(true); setSolidesError(''); let imported = 0; let skipped = 0;
+    setSolidesBusy(true); setSolidesError(''); let imported = 0; let skipped = 0; let firstError = '';
     try {
+      let defaultDepartmentId = data.departments[0]?.id || '';
+      if (!defaultDepartmentId) {
+        const department = await api('/departments', 'POST', {
+          name: 'A revisar - importação Sólides', manager: '', description: 'Departamento temporário para registros importados sem departamento informado.', color: '#3764eb', weekdays: [1, 2, 3, 4, 5], vaDeductions: ['Falta injustificada', 'Suspensão'], vtDeductions: ['Falta injustificada', 'Atestado', 'Férias'], sundayPolicy: 'Revisão por escala e convenção coletiva', womenSundayRest: 2,
+        });
+        defaultDepartmentId = department.id;
+      }
       for (const row of solidesRows) {
         const name = row.name || row.fullName || row.nome || row.employeeName;
         const registration = String(row.registration || row.registrationNumber || row.matricula || row.id || '').trim();
         if (!name || !registration || data.employees.some((e) => e.registration === registration)) { skipped++; continue; }
         try {
           const importedContractType = /pj|prestador|jur[ií]dica/i.test(String(row.contractType || row.contractTypeName || row.type || '')) ? 'PJ' : 'CLT';
-          await api('/employees', 'POST', { ...blank, name, registration, contractType: importedContractType, departmentId: row.departmentId || data.departments[0]?.id || '', cpf: row.cpf || '', email: row.email || '', jobTitle: row.jobTitle || row.role || row.jobRoleDTO?.name || 'Revisar cargo', admissionDate: solidesDate(row.admissionDate) || blank.admissionDate, scheduleName: solidesSchedule(row), salary: Number(row.salary || 0) });
+          await api('/employees', 'POST', { ...blank, name, registration, contractType: importedContractType, departmentId: row.departmentId || defaultDepartmentId, cpf: row.cpf || '', email: row.email || '', jobTitle: row.jobTitle || row.role || row.jobRoleDTO?.name || 'Revisar cargo', admissionDate: solidesDate(row.admissionDate) || blank.admissionDate, scheduleName: solidesSchedule(row), salary: Number(row.salary || 0), solidesData: row });
           imported++;
-        } catch { skipped++; }
+        } catch (e) { skipped++; if (!firstError) firstError = (e as Error).message; }
       }
-      await reload(); setSolidesSummary(`${imported} importados · ${skipped} ignorados por duplicidade ou dados incompletos.`); notify('Funcionários importados da Sólides.');
+      await reload();
+      setSolidesSummary(`${imported} importados · ${skipped} ignorados${firstError ? ` · Motivo: ${firstError}` : '.'}`);
+      if (imported > 0) notify(`${imported} funcionário(s) importado(s) da Sólides.`);
+      else setSolidesError(`Nenhum funcionário foi cadastrado. ${firstError || 'Verifique os dados recebidos da Sólides.'}`);
     } catch (e) { setSolidesError((e as Error).message); }
     finally { setSolidesBusy(false); }
   };
@@ -542,6 +553,7 @@ export default function Employees({ contractFilter }: { contractFilter?: 'CLT' |
               </div>
             ))}
           </div>
+          {view.solidesData && Object.keys(view.solidesData).length > 0 && <details style={{ marginTop: 20 }}><summary>Dados completos recebidos da Sólides</summary><pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, marginTop: 12 }}>{JSON.stringify(view.solidesData, null, 2)}</pre></details>}
           <div className="modal-footer">
             <Button
               onClick={() => {

@@ -51,6 +51,7 @@ export interface Employee {
   status: string;
   extraDays: string[];
   excludedDays: string[];
+  solidesData?: Record<string, unknown>;
 }
 export interface Company {
   legalName: string;

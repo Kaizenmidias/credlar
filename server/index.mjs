@@ -68,6 +68,7 @@ const empSchema = z.object({
   status: z.enum(['Ativo', 'Férias', 'Afastado', 'Desligado']),
   extraDays: z.array(date).default([]),
   excludedDays: z.array(date).default([]),
+  solidesData: z.record(z.string(), z.unknown()).default({}),
 });
 const ruleSchema = z.object({
   benefitType: z.enum(['va', 'vt', 'night']),
