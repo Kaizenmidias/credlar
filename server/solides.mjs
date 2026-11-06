@@ -20,8 +20,16 @@ async function solidesFetch({ baseUrl, token, path, params = {} }) {
   return body;
 }
 
+async function fetchSolidesSpec(baseUrl, token) {
+  try {
+    const response = await fetch(new URL('/v2/api-docs', baseUrl), { headers: { Accept: 'application/json' } });
+    if (response.ok) return response.json();
+  } catch { /* fallback authenticated */ }
+  return solidesFetch({ baseUrl, token, path: '/v2/api-docs' });
+}
+
 export async function discoverSolidesOperations({ baseUrl = DEFAULT_BASE_URL, token }) {
-  const spec = await solidesFetch({ baseUrl, token, path: '/v2/api-docs' });
+  const spec = await fetchSolidesSpec(baseUrl, token);
   const paths = Object.entries(spec?.paths || {}).flatMap(([path, operations]) => Object.entries(operations)
     .filter(([method]) => ['get'].includes(method.toLowerCase()))
     .map(([method, operation]) => ({ path, method: method.toUpperCase(), operationId: operation.operationId || '', summary: operation.summary || '', tags: operation.tags || [] })));

@@ -640,7 +640,11 @@ export async function createApp(db, { production = false, demo = false } = {}) {
     const saved = (await db.query('SELECT * FROM integration_credentials WHERE provider=?', ['solides'])).rows[0];
     if (!saved) return res.status(422).json({ message: 'Salve o token da Sólides antes de importar.' });
     const token = decryptSecret({ ciphertext: saved.ciphertext, iv: saved.iv, authTag: saved.auth_tag });
-    res.json(await importSolidesEntity({ baseUrl: saved.base_url, token, entity }));
+    try {
+      res.json(await importSolidesEntity({ baseUrl: saved.base_url, token, entity }));
+    } catch (error) {
+      res.status(error.status && Number(error.status) >= 400 ? Number(error.status) : 502).json({ message: error.message || 'Não foi possível consultar a Sólides.' });
+    }
   });
   app.put('/api/integration/credentials', admin, async (req, res) => {
     const input = z.object({ token: z.string().trim().min(12).max(10000), baseUrl: z.string().url().default('https://employer.tangerino.com.br') }).parse(req.body);
