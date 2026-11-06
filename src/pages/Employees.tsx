@@ -143,7 +143,9 @@ export default function Employees({ contractFilter }: { contractFilter?: 'CLT' |
         if (!name || !registration || data.employees.some((e) => e.registration === registration)) { skipped++; continue; }
         try {
           const importedContractType = /pj|prestador|jur[ií]dica/i.test(String(row.contractType || row.contractTypeName || row.type || '')) ? 'PJ' : 'CLT';
-          await api('/employees', 'POST', { ...blank, name, registration, contractType: importedContractType, departmentId: row.departmentId || defaultDepartmentId, cpf: row.cpf || '', email: row.email || '', jobTitle: row.jobTitle || row.role || row.jobRoleDTO?.name || 'Revisar cargo', admissionDate: solidesDate(row.admissionDate) || blank.admissionDate, scheduleName: solidesSchedule(row), salary: Number(row.salary || 0), solidesData: row });
+          const solidesDepartmentId = String(row.departmentId || row.department?.id || '');
+          const departmentId = data.departments.some((department) => department.id === solidesDepartmentId) ? solidesDepartmentId : defaultDepartmentId;
+          await api('/employees', 'POST', { ...blank, name, registration, contractType: importedContractType, departmentId, cpf: row.cpf || '', email: row.email || '', jobTitle: row.jobTitle || row.role || row.jobRoleDTO?.name || 'Revisar cargo', admissionDate: solidesDate(row.admissionDate) || blank.admissionDate, scheduleName: solidesSchedule(row), salary: Number(row.salary || 0), solidesData: row });
           imported++;
         } catch (e) { skipped++; if (!firstError) firstError = (e as Error).message; }
       }
