@@ -20,6 +20,12 @@ const templates = {
   employees:
     'name;registration;departmentId;jobTitle;admissionDate;salary\nPessoa de exemplo;CR1000;sede;Analista;2026-11-01;3500',
 };
+const datasetCatalog = [
+  ['employees','Funcionários'],['account','Conta e empresa'],['companies','Empresas e filiais'],['costCenters','Centros de custo'],['workplaces','Unidades e locais'],['jobRoles','Cargos'],['employeeFunctions','Funções'],['managers','Gestores'],['workSchedules','Jornadas e escalas'],['punchRules','Regras de ponto'],['holidays','Calendários e feriados'],['adjustmentReasons','Motivos de ajuste'],['adjustments','Ajustes e justificativas'],
+] as const;
+const fieldNames: Record<string,string> = { id:'Identificador', name:'Nome', description:'Descrição', code:'Código', email:'E-mail', cpf:'CPF', active:'Ativo', status:'Situação', registration:'Matrícula', admissionDate:'Data de admissão', birthDate:'Data de nascimento', externalCode:'Código externo', employerCode:'Código da empresa' };
+const readableLabel = (key: string) => fieldNames[key] || key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
+const readableValue = (value: any) => value == null || value === '' ? 'Não informado' : typeof value === 'boolean' ? (value ? 'Sim' : 'Não') : typeof value === 'object' ? JSON.stringify(value) : String(value);
 export default function Integration() {
   const { data, isAdmin, canEdit, reload, notify } = useDho();
   const [kind, setKind] = useState<keyof typeof templates>('punches'),
@@ -35,7 +41,9 @@ export default function Integration() {
     [apiBusy, setApiBusy] = useState(false),
     [apiImporting, setApiImporting] = useState(false),
     [syncingAll, setSyncingAll] = useState(false),
-    [syncResult, setSyncResult] = useState<any>(null);
+    [syncResult, setSyncResult] = useState<any>(null),
+    [dataView, setDataView] = useState<any>(null),
+    [dataViewBusy, setDataViewBusy] = useState(false);
   const previewApi = async () => {
     setApiBusy(true); setApiRows([]); setError('');
     try {
@@ -371,6 +379,12 @@ export default function Integration() {
           ))}
         </div>
       </Card>
+      <Card className="padded">
+        <h2>Dados trazidos da Sólides</h2>
+        <p className="muted">Consulte cada conjunto já armazenado. Os nomes técnicos são apresentados em linguagem de negócio e a resposta original continua preservada no servidor.</p>
+        <div className="capability-grid">{datasetCatalog.map(([key,label]) => <button type="button" className="card-bottom-link" key={key} onClick={async () => { setDataViewBusy(true); try { setDataView(await api(`/integration/solides/data?kind=${key}&page=1&size=20`)); } catch (e) { notify((e as Error).message,'red'); } finally { setDataViewBusy(false); } }}>{label}<ArrowRight size={15}/></button>)}</div>
+      </Card>
+      {dataView && <Modal wide title={datasetCatalog.find(([key]) => key === dataView.kind)?.[1] || 'Dados da Sólides'} description={`${dataView.total} registros sincronizados · página ${dataView.page} de ${Math.max(1,dataView.pages)}`} onClose={() => setDataView(null)}><div className="table-wrap"><table><tbody>{dataView.rows.map((record: any, index: number) => <tr key={record.externalId || index}><td><b>{record.externalId || index + 1}</b></td><td><div className="detail-grid">{Object.entries(record.payload || {}).map(([key,value]) => <div key={key}><small>{readableLabel(key)}</small><strong>{readableValue(value)}</strong></div>)}</div></td></tr>)}</tbody></table></div><div className="modal-footer"><Button variant="secondary" disabled={dataView.page <= 1 || dataViewBusy} onClick={async () => setDataView(await api(`/integration/solides/data?kind=${dataView.kind}&page=${dataView.page-1}&size=20`))}>Anterior</Button><Button variant="secondary" disabled={dataView.page >= dataView.pages || dataViewBusy} onClick={async () => setDataView(await api(`/integration/solides/data?kind=${dataView.kind}&page=${dataView.page+1}&size=20`))}>Próxima</Button><Button onClick={() => setDataView(null)}>Fechar</Button></div></Modal>}
       {importing && (
         <Modal
           title="Importar dados"

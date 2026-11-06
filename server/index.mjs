@@ -219,7 +219,7 @@ export async function createApp(db, { production = false, demo = false } = {}) {
       employees: await list('employees'),
       departments: await list('departments'),
       units: await list('units'),
-      records: (await db.query('SELECT * FROM records')).rows.map((r) => ({
+      records: (await db.query("SELECT * FROM records WHERE kind NOT LIKE 'solides_%'")).rows.map((r) => ({
         ...JSON.parse(r.data),
         id: r.id,
         kind: r.kind,
@@ -764,6 +764,15 @@ export async function createApp(db, { production = false, demo = false } = {}) {
     } catch (error) {
       res.status(error.status && Number(error.status) >= 400 ? Number(error.status) : 502).json({ message: error.message || 'Não foi possível sincronizar todos os dados da Sólides.' });
     }
+  });
+  app.get('/api/integration/solides/data', admin, async (req, res) => {
+    const kind = z.string().regex(/^[A-Za-z]+$/).parse(req.query.kind || 'employees');
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const size = Math.min(100, Math.max(1, Number(req.query.size) || 20));
+    const dbKind = `solides_${kind}`;
+    const total = Number((await db.query('SELECT COUNT(*) total FROM records WHERE kind=?', [dbKind])).rows[0]?.total || 0);
+    const rows = (await db.query(`SELECT data FROM records WHERE kind=? ORDER BY id LIMIT ${size} OFFSET ${(page - 1) * size}`, [dbKind])).rows.map((row) => JSON.parse(row.data));
+    res.json({ kind, page, size, total, pages: Math.ceil(total / size), rows });
   });
   app.put('/api/integration/credentials', admin, async (req, res) => {
     const input = z.object({ token: z.string().trim().min(12).max(10000), baseUrl: z.string().url().default('https://employer.tangerino.com.br') }).parse(req.body);
