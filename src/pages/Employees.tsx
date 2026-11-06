@@ -480,7 +480,7 @@ export default function Employees() {
         {!solidesRows.length && <Notice>O sistema consultará a API usando o token salvo em Integrações.</Notice>}
         {solidesError && <Notice tone="red">{solidesError}</Notice>}
         {solidesSummary && <Notice tone="green">{solidesSummary}</Notice>}
-        {solidesRows.length > 0 && <div className="table-wrap"><table><thead><tr>{Object.keys(solidesRows[0]).slice(0, 7).map((k) => <th key={k}>{k}</th>)}</tr></thead><tbody>{solidesRows.slice(0, 8).map((row, i) => <tr key={i}>{Object.values(row).slice(0, 7).map((v: any, j) => <td key={j}>{String(v ?? '')}</td>)}</tr>)}</tbody></table></div>}
+        {solidesRows.length > 0 && <div className="table-wrap"><table><thead><tr>{Object.keys(solidesRows[0]).slice(0, 7).map((k) => <th key={k}>{({ id: 'ID', name: 'Nome', fullName: 'Nome completo', registration: 'Matrícula', cpf: 'CPF', email: 'E-mail', department: 'Departamento', jobTitle: 'Cargo' } as Record<string, string>)[k] || k}</th>)}</tr></thead><tbody>{solidesRows.slice(0, 8).map((row, i) => <tr key={i}>{Object.values(row).slice(0, 7).map((v: any, j) => <td key={j}>{String(v ?? '')}</td>)}</tr>)}</tbody></table></div>}
         <div className="modal-footer"><Button variant="secondary" disabled={solidesBusy} onClick={() => setSolidesOpen(false)}>Fechar</Button>{!solidesRows.length ? <Button busy={solidesBusy} onClick={previewSolides}>Buscar na Sólides</Button> : <Button busy={solidesBusy} onClick={importSolides}>Confirmar importação</Button>}</div>
       </Modal>}
       {view && (
